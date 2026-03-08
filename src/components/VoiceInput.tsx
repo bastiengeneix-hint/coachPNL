@@ -101,7 +101,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
     <div className="flex flex-col items-center">
       {/* Transcription en cours */}
       {isRecording && transcript && (
-        <div className="mb-3 px-4 py-2 rounded-xl bg-[var(--color-bg-tertiary)] text-sm text-[var(--color-text-secondary)] max-w-full overflow-hidden animate-fade-in">
+        <div className="mb-3 px-4 py-2 rounded-xl bg-[var(--color-glass)] backdrop-blur-xl border border-[var(--color-glass-border)] text-sm text-[var(--color-text-secondary)] max-w-full overflow-hidden animate-fade-in">
           <p className="line-clamp-3">{transcript}</p>
         </div>
       )}
@@ -110,19 +110,28 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
       <button
         onClick={toggleRecording}
         disabled={disabled}
-        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer ${
+        className={`w-12 h-12 rounded-full flex items-center justify-center spring cursor-pointer ${
           isRecording
-            ? 'bg-red-500 mic-recording'
-            : 'bg-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:opacity-90'
+            ? 'bg-rose-500 mic-recording'
+            : 'bg-[linear-gradient(135deg,var(--color-gradient-start),var(--color-gradient-end))] hover:brightness-110 shadow-lg shadow-[var(--color-accent-soft)]'
         } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
-        aria-label={isRecording ? 'Arrêter' : 'Parler'}
+        aria-label={isRecording ? 'Arreter' : 'Parler'}
       >
         {isRecording ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
             <rect x="6" y="6" width="12" height="12" rx="2" />
           </svg>
         ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
             <line x1="12" y1="19" x2="12" y2="23" />
@@ -132,7 +141,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
       </button>
 
       {isRecording && (
-        <span className="mt-2 text-xs text-red-400 animate-pulse-soft">
+        <span className="mt-2 text-xs text-[var(--color-accent)] animate-pulse-warm">
           Enregistrement...
         </span>
       )}

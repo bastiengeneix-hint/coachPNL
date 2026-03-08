@@ -1,83 +1,79 @@
 'use client';
 
 import { Session, Profile, ActiveContext } from '@/types';
-import { defaultProfile } from './default-profile';
-
-const KEYS = {
-  SESSIONS: 'innercoach_sessions',
-  PROFILE: 'innercoach_profile',
-  CONTEXT: 'innercoach_context',
-} as const;
-
-function getItem<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function setItem(key: string, value: unknown): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(value));
-}
 
 // --- Sessions ---
 
-export function getSessions(): Session[] {
-  return getItem<Session[]>(KEYS.SESSIONS, []);
+export async function getSessions(): Promise<Session[]> {
+  const res = await fetch('/api/sessions');
+  if (!res.ok) return [];
+  return res.json();
 }
 
-export function getSession(id: string): Session | null {
-  const sessions = getSessions();
+export async function getRecentSessions(days: number = 7): Promise<Session[]> {
+  const res = await fetch(`/api/sessions?recent=${days}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getSession(id: string): Promise<Session | null> {
+  const sessions = await getSessions();
   return sessions.find((s) => s.id === id) ?? null;
 }
 
-export function saveSession(session: Session): void {
-  const sessions = getSessions();
-  const idx = sessions.findIndex((s) => s.id === session.id);
-  if (idx >= 0) {
-    sessions[idx] = session;
-  } else {
-    sessions.push(session);
-  }
-  setItem(KEYS.SESSIONS, sessions);
-}
-
-export function getRecentSessions(days: number = 7): Session[] {
-  const sessions = getSessions();
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  return sessions
-    .filter((s) => new Date(s.date).getTime() > cutoff)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+export async function saveSession(session: Session): Promise<void> {
+  await fetch('/api/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(session),
+  });
 }
 
 // --- Profile ---
 
-export function getProfile(): Profile {
-  return getItem<Profile>(KEYS.PROFILE, defaultProfile);
+export async function getProfile(): Promise<Profile> {
+  const res = await fetch('/api/profile');
+  if (!res.ok) return defaultEmptyProfile;
+  return res.json();
 }
 
-export function updateProfile(updates: Partial<Profile>): void {
-  const current = getProfile();
-  setItem(KEYS.PROFILE, { ...current, ...updates });
+export async function updateProfile(updates: Partial<Profile>): Promise<void> {
+  await fetch('/api/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
 }
 
 // --- Active Context ---
 
-const defaultContext: ActiveContext = {
+export async function getActiveContext(): Promise<ActiveContext> {
+  const res = await fetch('/api/context');
+  if (!res.ok) return defaultEmptyContext;
+  return res.json();
+}
+
+export async function updateActiveContext(context: ActiveContext): Promise<void> {
+  await fetch('/api/context', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(context),
+  });
+}
+
+// --- Defaults ---
+
+const defaultEmptyProfile: Profile = {
+  projets: [],
+  patterns_sabotage: [],
+  barrieres_ulp: [],
+  croyances_limitantes: [],
+  preferences: { ce_qui_aide: [], ce_qui_bloque: [], ton: 'mix' as const },
+};
+
+const defaultEmptyContext: ActiveContext = {
   summary: '',
   last_updated: new Date().toISOString(),
   recent_themes: [],
   pending_exercice: null,
 };
-
-export function getActiveContext(): ActiveContext {
-  return getItem<ActiveContext>(KEYS.CONTEXT, defaultContext);
-}
-
-export function updateActiveContext(context: ActiveContext): void {
-  setItem(KEYS.CONTEXT, context);
-}

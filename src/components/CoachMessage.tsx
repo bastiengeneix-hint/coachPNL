@@ -14,16 +14,16 @@ export default function CoachMessage({ message }: CoachMessageProps) {
       className={`flex animate-fade-in ${isCoach ? 'justify-start' : 'justify-end'}`}
     >
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+        className={`max-w-[85%] px-4 py-3 ${
           isCoach
-            ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] rounded-tl-md'
-            : 'bg-[var(--color-accent)] text-white rounded-tr-md'
+            ? 'bg-[var(--color-glass)] backdrop-blur-xl border border-[var(--color-glass-border)] text-[var(--color-text-primary)] rounded-2xl rounded-tl-md'
+            : 'bg-[linear-gradient(135deg,var(--color-gradient-start),var(--color-gradient-end))] text-white rounded-2xl rounded-tr-md shadow-lg shadow-[var(--color-accent-soft)]'
         }`}
       >
         <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
           {message.content}
         </p>
-        <span className="block mt-1 text-[10px] opacity-40">
+        <span className="block mt-1 text-[10px] opacity-30">
           {new Date(message.timestamp).toLocaleTimeString('fr-FR', {
             hour: '2-digit',
             minute: '2-digit',

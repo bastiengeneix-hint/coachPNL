@@ -1,3 +1,12 @@
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  role: 'user' | 'admin';
+  onboarding_complete: boolean;
+  created_at: string;
+}
+
 export type SessionMode = 'deblocage' | 'journal';
 
 export interface Message {
@@ -32,6 +41,7 @@ export interface Profile {
   preferences: {
     ce_qui_aide: string[];
     ce_qui_bloque: string[];
+    ton: 'direct' | 'doux' | 'mix';
   };
 }
 

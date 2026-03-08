@@ -1,5 +1,17 @@
-// RAG Retrieval - MVP avec recherche par mots-clés
-// En v2 : embeddings + vector DB (pgvector/ChromaDB)
+// RAG Retrieval — Recherche vectorielle pgvector + reformulation Claude Haiku
+// OpenAI = embeddings uniquement | Claude Haiku = reformulation de query | Claude Sonnet = coaching
+
+import { createServerClient } from '@/lib/supabase/server';
+import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+
+function getOpenAI() {
+  return new OpenAI();
+}
+
+function getAnthropic() {
+  return new Anthropic();
+}
 
 interface RAGPassage {
   livre: string;
@@ -7,117 +19,120 @@ interface RAGPassage {
   content: string;
 }
 
-// Base de connaissances intégrée (concepts clés des sources v1)
-// En v2 : remplacé par le vrai pipeline d'embeddings sur les PDFs
-const KNOWLEDGE_BASE: Array<{
-  livre: string;
-  auteur: string;
-  page: string;
-  content: string;
-  keywords: string[];
-}> = [
-  // The Big Leap — Gay Hendricks
-  {
-    livre: 'The Big Leap — Hendricks',
-    auteur: 'Gay Hendricks',
-    page: '12',
-    content:
-      "I have a limited tolerance for feeling good. When I hit my Upper Limit, I manufacture thoughts that make me feel bad. The Upper Limit Problem is the human tendency to put the brakes on our positive energy when we've exceeded our internal thermostat setting for how much success, wealth, happiness, love, and intimacy we think we deserve.",
-    keywords: ['limite', 'sabotage', 'succès', 'bonheur', 'thermostat', 'frein', 'ulp', 'upper limit'],
-  },
-  {
-    livre: 'The Big Leap — Hendricks',
-    auteur: 'Gay Hendricks',
-    page: '34',
-    content:
-      "There are four hidden barriers that keep us from reaching our Zone of Genius: the belief that we are fundamentally flawed, the fear that we will be disloyal to our roots, the belief that more success will bring a bigger burden, and the fear that we will outshine others.",
-    keywords: ['barrière', 'génie', 'zone', 'défaillant', 'déloyauté', 'fardeau', 'éclipser', 'croyance'],
-  },
-  {
-    livre: 'The Big Leap — Hendricks',
-    auteur: 'Gay Hendricks',
-    page: '56',
-    content:
-      "The Zone of Incompetence is made up of activities we're not good at. The Zone of Competence is where we do things competently but others can do them just as well. The Zone of Excellence is where we do things extremely well. The Zone of Genius is where we do what we are uniquely suited to do — it draws upon our special abilities.",
-    keywords: ['zone', 'incompétence', 'compétence', 'excellence', 'génie', 'talent', 'unique'],
-  },
-  {
-    livre: 'The Big Leap — Hendricks',
-    auteur: 'Gay Hendricks',
-    page: '78',
-    content:
-      "A Wonder Question opens up new possibilities by shifting from fear-based thinking to wonder-based thinking. Instead of worrying about what might go wrong, ask: How much love and abundance am I willing to let in? What is my genius? How can I bring my genius to every moment?",
-    keywords: ['wonder', 'question', 'amour', 'abondance', 'génie', 'possibilité', 'peur'],
-  },
-  // Système 1 / Système 2 — Kahneman
-  {
-    livre: 'Système 1 & 2 — Kahneman',
-    auteur: 'Daniel Kahneman',
-    page: '20',
-    content:
-      "System 1 operates automatically and quickly, with little or no effort and no sense of voluntary control. System 2 allocates attention to effortful mental activities, including complex computations. When we think of ourselves, we identify with System 2, the conscious, reasoning self. But it is the automatic System 1 that effortlessly originates impressions and feelings that are the main sources of the explicit beliefs and deliberate choices of System 2.",
-    keywords: ['système', 'automatique', 'rapide', 'effort', 'attention', 'conscient', 'impression', 'croyance'],
-  },
-  {
-    livre: 'Système 1 & 2 — Kahneman',
-    auteur: 'Daniel Kahneman',
-    page: '98',
-    content:
-      "A reliable way to make people believe in falsehoods is frequent repetition, because familiarity is not easily distinguished from truth. The emotional tail wags the rational dog. The confidence that individuals have in their beliefs depends mostly on the quality of the story they can tell about what they see.",
-    keywords: ['croyance', 'répétition', 'émotion', 'confiance', 'histoire', 'biais', 'vérité', 'rationnel'],
-  },
-  {
-    livre: 'Système 1 & 2 — Kahneman',
-    auteur: 'Daniel Kahneman',
-    page: '134',
-    content:
-      "Loss aversion refers to the relative strength of two motives: we are driven more strongly to avoid losses than to achieve gains. The response to losses is stronger than the response to corresponding gains. This asymmetry is a powerful conservative force that favors minimal changes from the status quo.",
-    keywords: ['perte', 'aversion', 'gain', 'changement', 'status quo', 'risque', 'décision', 'peur'],
-  },
-  {
-    livre: 'Système 1 & 2 — Kahneman',
-    auteur: 'Daniel Kahneman',
-    page: '186',
-    content:
-      "Nothing in life is as important as you think it is when you are thinking about it. The focusing illusion creates a bias in favor of goods and experiences that are initially exciting but that become less pleasurable over time.",
-    keywords: ['focus', 'illusion', 'important', 'attention', 'bonheur', 'perspective', 'recul'],
-  },
-];
-
-export function retrievePassages(
+// Reformuler le message utilisateur en intention émotionnelle pour meilleure recherche
+async function reformulateQuery(
   userMessage: string,
-  _recentMessages: string[] = []
-): RAGPassage[] {
+  recentMessages: string[]
+): Promise<string> {
+  try {
+    const context = recentMessages.slice(-3).join('\n');
+
+    const response = await getAnthropic().messages.create({
+      model: 'claude-haiku-4-20250414',
+      max_tokens: 150,
+      system: `Tu es un assistant de reformulation. Reformule le message suivant en une requête de recherche optimisée pour la recherche sémantique dans une base de connaissances en développement personnel et PNL. Extrais l'intention émotionnelle et les thèmes profonds. Garde le français. Réponds UNIQUEMENT avec la requête reformulée, rien d'autre.`,
+      messages: [
+        {
+          role: 'user',
+          content: context
+            ? `Contexte récent:\n${context}\n\nMessage:\n${userMessage}`
+            : userMessage,
+        },
+      ],
+    });
+
+    const content = response.content[0];
+    return content.type === 'text' ? content.text : userMessage;
+  } catch {
+    // En cas d'erreur, utiliser le message brut
+    return userMessage;
+  }
+}
+
+// Générer l'embedding de la query via OpenAI
+async function embedQuery(query: string): Promise<number[]> {
+  const response = await getOpenAI().embeddings.create({
+    model: 'text-embedding-3-small',
+    input: query,
+  });
+  return response.data[0].embedding;
+}
+
+// Recherche vectorielle dans Supabase pgvector
+export async function retrievePassages(
+  userMessage: string,
+  recentMessages: string[] = []
+): Promise<RAGPassage[]> {
+  // Pas de retrieval sur messages très courts
   if (userMessage.length < 15) return [];
 
-  const query = userMessage.toLowerCase();
-  const scored = KNOWLEDGE_BASE.map((entry) => {
-    let score = 0;
-    for (const kw of entry.keywords) {
-      if (query.includes(kw)) {
-        score += 2;
-      }
-    }
-    // Bonus pour correspondance partielle
-    const words = query.split(/\s+/);
-    for (const word of words) {
-      if (word.length < 3) continue;
-      for (const kw of entry.keywords) {
-        if (kw.includes(word) || word.includes(kw)) {
-          score += 1;
-        }
-      }
-    }
-    return { ...entry, score };
-  });
+  try {
+    const supabase = createServerClient();
 
-  return scored
-    .filter((s) => s.score >= 3)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((s) => ({
-      livre: s.livre,
-      page: s.page,
-      content: s.content,
-    }));
+    // Vérifier s'il y a des sources actives
+    const { data: activeSources } = await supabase
+      .from('sources')
+      .select('id')
+      .eq('active', true);
+
+    if (!activeSources || activeSources.length === 0) return [];
+
+    // Reformuler pour meilleur match sémantique (Claude Haiku)
+    const reformulated = await reformulateQuery(userMessage, recentMessages);
+
+    // Embedding de la query (OpenAI)
+    const embedding = await embedQuery(reformulated);
+
+    // Recherche via la fonction RPC match_chunks (pgvector cosine similarity)
+    const { data: chunks, error } = await supabase.rpc('match_chunks', {
+      query_embedding: JSON.stringify(embedding),
+      match_threshold: 0.72,
+      match_count: 9,
+    });
+
+    if (error || !chunks || chunks.length === 0) return [];
+
+    // Grouper par source, max 3 par source
+    const bySource = new Map<string, typeof chunks>();
+    for (const chunk of chunks) {
+      const existing = bySource.get(chunk.source_id) || [];
+      if (existing.length < 3) {
+        existing.push(chunk);
+        bySource.set(chunk.source_id, existing);
+      }
+    }
+
+    // Joindre avec les sources pour le titre
+    const sourceIds = [...bySource.keys()];
+    const { data: sources } = await supabase
+      .from('sources')
+      .select('id, titre, auteur')
+      .in('id', sourceIds);
+
+    const sourceMap = new Map(
+      sources?.map((s) => [s.id, s]) || []
+    );
+
+    // Formater les passages
+    const passages: RAGPassage[] = [];
+    for (const [sourceId, sourceChunks] of bySource) {
+      const source = sourceMap.get(sourceId);
+      for (const chunk of sourceChunks) {
+        passages.push({
+          livre: source
+            ? `${source.titre} — ${source.auteur}`
+            : 'Source inconnue',
+          page: chunk.page_start
+            ? `${chunk.page_start}${chunk.page_end ? `-${chunk.page_end}` : ''}`
+            : '?',
+          content: chunk.content,
+        });
+      }
+    }
+
+    return passages.slice(0, 9);
+  } catch (error) {
+    console.error('RAG retrieval error:', error);
+    return [];
+  }
 }
