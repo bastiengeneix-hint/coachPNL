@@ -13,30 +13,30 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
     .find((m) => m.role === 'coach');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in px-6">
-      <div className="w-full max-w-sm bg-[var(--color-glass)] backdrop-blur-xl border border-[var(--color-glass-border)] rounded-3xl p-6 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 animate-fade-in px-6">
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 space-y-6 border border-gray-100">
         <div className="text-center">
           {/* Checkmark icon */}
-          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--color-accent-soft)] flex items-center justify-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-teal-50 flex items-center justify-center">
             <svg
-              width="24"
-              height="24"
+              width="28"
+              height="28"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="var(--color-accent)"
-              strokeWidth="2"
+              stroke="currentColor"
+              strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className="text-teal-600"
             >
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
+              <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold gradient-text">
-            Session terminee
+          <h2 className="text-xl font-semibold text-teal-600">
+            Session terminée
           </h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {session.mode === 'deblocage' ? 'Deblocage' : 'Journal'} —{' '}
+          <p className="mt-1.5 text-sm text-gray-400">
+            {session.mode === 'deblocage' ? 'Déblocage' : 'Journal'} —{' '}
             {new Date(session.date).toLocaleDateString('fr-FR', {
               day: 'numeric',
               month: 'long',
@@ -46,11 +46,11 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
 
         {/* Insight cle */}
         {lastCoachMessage && (
-          <div className="bg-[var(--color-glass)] backdrop-blur-xl border border-[var(--color-glass-border)] rounded-xl p-4">
-            <p className="text-xs text-[var(--color-text-muted)] mb-2">
-              Derniere note du coach
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+            <p className="text-xs font-medium text-gray-400 mb-2 uppercase tracking-wide">
+              Dernière note du coach
             </p>
-            <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed line-clamp-4">
+            <p className="text-sm text-gray-500 leading-relaxed line-clamp-4">
               {lastCoachMessage.content}
             </p>
           </div>
@@ -62,7 +62,7 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
             {session.themes.map((theme) => (
               <span
                 key={theme}
-                className="px-3 py-1 rounded-full text-xs bg-[var(--color-accent-soft)] text-[var(--color-accent)] border border-[var(--color-accent)]/20"
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-teal-50 text-teal-600"
               >
                 {theme}
               </span>
@@ -72,11 +72,11 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
 
         {/* Exercice */}
         {session.exercice_propose && (
-          <div className="bg-[var(--color-glass)] backdrop-blur-xl border border-[var(--color-glass-border)] rounded-xl p-4">
-            <p className="text-xs text-[var(--color-accent)] mb-1">
-              Exercice propose
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+            <p className="text-xs font-medium text-teal-600 mb-1.5 uppercase tracking-wide">
+              Exercice proposé
             </p>
-            <p className="text-sm text-[var(--color-text-primary)]">
+            <p className="text-sm text-gray-800 leading-relaxed">
               {session.exercice_propose}
             </p>
           </div>
@@ -84,7 +84,7 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
 
         <button
           onClick={onClose}
-          className="w-full py-3 rounded-xl bg-[linear-gradient(135deg,var(--color-gradient-start),var(--color-gradient-end),var(--color-gradient-mid))] text-white font-medium text-sm hover:brightness-110 spring cursor-pointer shadow-lg shadow-[var(--color-accent-soft)]"
+          className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm transition-all active:scale-[0.98] cursor-pointer"
         >
           Fermer
         </button>

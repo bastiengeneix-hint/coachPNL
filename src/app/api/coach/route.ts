@@ -7,8 +7,17 @@ import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { SessionMode, Profile, ActiveContext } from '@/types';
 
+function getAnthropicKey(): string {
+  // Use INNER_COACH_ prefixed key first (avoids system env overrides like Claude Code)
+  const key = process.env.INNER_COACH_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    throw new Error('ANTHROPIC_API_KEY is not set. Add INNER_COACH_ANTHROPIC_KEY to your .env file.');
+  }
+  return key;
+}
+
 function getAnthropic() {
-  return new Anthropic();
+  return new Anthropic({ apiKey: getAnthropicKey() });
 }
 
 export async function POST(req: NextRequest) {
@@ -125,11 +134,19 @@ export async function POST(req: NextRequest) {
     const textContent = response.content.find((block) => block.type === 'text');
     const messageText = textContent ? textContent.text : '';
 
+    if (!messageText) {
+      return NextResponse.json(
+        { error: 'Le coach n\'a pas pu générer de réponse. Réessaye.' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({ message: messageText });
   } catch (error) {
     console.error('Coach API error:', error);
+    const message = error instanceof Error ? error.message : 'Erreur interne du serveur';
     return NextResponse.json(
-      { error: 'Erreur interne du serveur' },
+      { error: message },
       { status: 500 }
     );
   }

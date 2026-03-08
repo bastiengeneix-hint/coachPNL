@@ -2,11 +2,48 @@
 // OpenAI est utilisé UNIQUEMENT pour les embeddings vectoriels
 // Le coaching et la reformulation de query sont 100% Claude
 
+// Polyfill browser APIs required by pdfjs-dist v5+ in Node.js
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  globalThis.DOMMatrix = class DOMMatrix {
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    is2D = true;
+    isIdentity = true;
+    inverse() { return new DOMMatrix(); }
+    multiply() { return new DOMMatrix(); }
+    translate() { return new DOMMatrix(); }
+    scale() { return new DOMMatrix(); }
+    rotate() { return new DOMMatrix(); }
+    transformPoint() { return { x: 0, y: 0, z: 0, w: 1 }; }
+  } as unknown as typeof globalThis.DOMMatrix;
+}
+if (typeof globalThis.Path2D === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  globalThis.Path2D = class Path2D {
+    addPath() {}
+    closePath() {}
+    moveTo() {}
+    lineTo() {}
+    bezierCurveTo() {}
+    quadraticCurveTo() {}
+    arc() {}
+    arcTo() {}
+    ellipse() {}
+    rect() {}
+  } as unknown as typeof globalThis.Path2D;
+}
+
 import { createServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 
 function getOpenAI() {
-  return new OpenAI();
+  return new OpenAI({
+    apiKey: process.env.INNER_COACH_OPENAI_KEY || process.env.OPENAI_API_KEY,
+  });
 }
 
 interface ChunkMeta {
@@ -16,10 +53,11 @@ interface ChunkMeta {
   chapitre: string | null;
 }
 
-// Étape 1 : Extraire le texte du PDF
+// Étape 1 : Extraire le texte du PDF (pdf-parse v1 API)
 export async function extractText(buffer: Buffer): Promise<string> {
+  // Use pdf-parse/lib/pdf-parse.js directly to avoid the test file loading issue
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse');
+  const pdfParse = require('pdf-parse/lib/pdf-parse');
   const data = await pdfParse(buffer);
   return data.text;
 }
@@ -145,10 +183,14 @@ export async function storeChunks(
   }
 
   // Mettre à jour le compteur de chunks sur la source
-  await supabase
+  const { error: updateError } = await supabase
     .from('sources')
     .update({ chunks_count: chunks.length })
     .eq('id', sourceId);
+
+  if (updateError) {
+    console.error('Erreur mise à jour chunks_count:', updateError);
+  }
 }
 
 // Pipeline complet : PDF → text → chunks → embeddings → Supabase

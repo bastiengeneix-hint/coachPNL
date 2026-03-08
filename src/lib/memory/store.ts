@@ -22,11 +22,15 @@ export async function getSession(id: string): Promise<Session | null> {
 }
 
 export async function saveSession(session: Session): Promise<void> {
-  await fetch('/api/sessions', {
+  const res = await fetch('/api/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(session),
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Erreur lors de la sauvegarde de la session');
+  }
 }
 
 // --- Profile ---
@@ -38,11 +42,15 @@ export async function getProfile(): Promise<Profile> {
 }
 
 export async function updateProfile(updates: Partial<Profile>): Promise<void> {
-  await fetch('/api/profile', {
+  const res = await fetch('/api/profile', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Erreur lors de la mise à jour du profil');
+  }
 }
 
 // --- Active Context ---
@@ -54,11 +62,15 @@ export async function getActiveContext(): Promise<ActiveContext> {
 }
 
 export async function updateActiveContext(context: ActiveContext): Promise<void> {
-  await fetch('/api/context', {
+  const res = await fetch('/api/context', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(context),
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Erreur lors de la mise à jour du contexte');
+  }
 }
 
 // --- Defaults ---

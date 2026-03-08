@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     // Validate password length
     if (!password || password.length < 6) {
       return NextResponse.json(
-        { error: 'Le mot de passe doit contenir au moins 6 caracteres' },
+        { error: 'Le mot de passe doit contenir au moins 6 caractères' },
         { status: 400 }
       );
     }
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Un compte avec cet email existe deja' },
+        { error: 'Un compte avec cet email existe déjà' },
         { status: 409 }
       );
     }
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     if (userError || !newUser) {
       console.error('Error creating user:', userError);
       return NextResponse.json(
-        { error: 'Erreur lors de la creation du compte' },
+        { error: 'Erreur lors de la création du compte' },
         { status: 500 }
       );
     }
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       // Cleanup: delete the user if profile creation fails
       await supabase.from('users').delete().eq('id', newUser.id);
       return NextResponse.json(
-        { error: 'Erreur lors de la creation du profil' },
+        { error: 'Erreur lors de la création du profil' },
         { status: 500 }
       );
     }
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       await supabase.from('profiles').delete().eq('user_id', newUser.id);
       await supabase.from('users').delete().eq('id', newUser.id);
       return NextResponse.json(
-        { error: 'Erreur lors de la creation du contexte' },
+        { error: 'Erreur lors de la création du contexte' },
         { status: 500 }
       );
     }

@@ -45,7 +45,7 @@ const tonOptions: { value: 'direct' | 'doux' | 'mix'; label: string; description
 const profileSections: { key: keyof Omit<Profile, 'preferences'>; label: string }[] = [
   { key: 'projets', label: 'Projets en cours' },
   { key: 'patterns_sabotage', label: 'Patterns de sabotage' },
-  { key: 'barrieres_ulp', label: 'Barri\u00e8res ULP' },
+  { key: 'barrieres_ulp', label: 'Barrières ULP' },
   { key: 'croyances_limitantes', label: 'Croyances limitantes' },
 ];
 
@@ -85,17 +85,12 @@ function EditableList({
         {items.map((item, index) => (
           <span
             key={index}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm"
-            style={{
-              backgroundColor: 'rgba(245, 158, 11, 0.15)',
-              border: '1px solid rgba(245, 158, 11, 0.3)',
-              color: 'var(--color-accent)',
-            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-teal-50 text-teal-700 border border-teal-200"
           >
             {item}
             <button
               onClick={() => handleRemove(index)}
-              className="ml-1 hover:opacity-70 transition-opacity"
+              className="ml-0.5 hover:text-red-500 transition-colors"
               aria-label={`Supprimer ${item}`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -112,23 +107,11 @@ function EditableList({
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="flex-1 px-3 py-2 rounded-lg text-sm text-white placeholder:text-white/30 outline-none transition-colors"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary, rgba(255,255,255,0.06))',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            borderColor: 'var(--color-glass-border)',
-          }}
-          onFocus={(e) => (e.target.style.borderColor = 'var(--color-accent)')}
-          onBlur={(e) => (e.target.style.borderColor = 'var(--color-glass-border)')}
+          className="flex-1 py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none transition-all focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         />
         <button
           onClick={handleAdd}
-          className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105"
-          style={{
-            background: 'linear-gradient(135deg, var(--color-accent), #d97706)',
-            color: '#0f0d0a',
-          }}
+          className="px-4 py-2.5 rounded-xl text-sm font-medium bg-teal-600 text-white transition-all hover:bg-teal-700 active:scale-[0.98]"
         >
           Ajouter
         </button>
@@ -249,10 +232,18 @@ export default function SettingsPage() {
       });
 
       setUploadStatus('Indexation...');
-      const data = await res.json();
+
+      const contentType = res.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { error: text || 'Erreur serveur' };
+      }
 
       if (res.ok) {
-        setUploadStatus(`Termin\u00e9 (${data.chunks_count || 0} chunks)`);
+        setUploadStatus(`Terminé (${data.chunksCount || data.chunks_count || 0} chunks)`);
         setUploadFile(null);
         setUploadTitre('');
         setUploadAuteur('');
@@ -267,126 +258,119 @@ export default function SettingsPage() {
 
         setTimeout(() => setUploadStatus(null), 3000);
       } else {
-        setUploadStatus(`Erreur: ${data.error || 'Upload \u00e9chou\u00e9'}`);
+        setUploadStatus(`Erreur: ${data.error || 'Upload échoué'}`);
         setTimeout(() => setUploadStatus(null), 5000);
       }
     } catch (err) {
       console.error('Upload failed:', err);
-      setUploadStatus('Erreur lors de l\u2019upload');
+      setUploadStatus("Erreur lors de l'upload");
       setTimeout(() => setUploadStatus(null), 5000);
     }
   };
 
   if (loading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: 'var(--color-bg-primary)' }}
-      >
-        <p className="text-sm animate-pulse" style={{ color: 'var(--color-accent)' }}>
-          Chargement...
-        </p>
+      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+        <div className="flex gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse" style={{ animationDelay: '0ms' }} />
+          <div className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse" style={{ animationDelay: '200ms' }} />
+          <div className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse" style={{ animationDelay: '400ms' }} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-20" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+    <div className="min-h-screen pb-24 bg-stone-50">
       {/* Header */}
-      <div
-        className="glass sticky top-0 z-10 px-4 py-3 flex items-center justify-between"
-        style={{ backdropFilter: 'blur(20px)' }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-semibold text-white">R\u00e9glages</h1>
+      <div className="pt-20 max-w-3xl mx-auto px-6">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              Réglages
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Personnalise ton expérience
+            </p>
+          </div>
+          {showSaved && (
+            <span className="text-sm text-emerald-500 animate-fade-in font-medium flex items-center gap-1.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Sauvegardé
+            </span>
+          )}
         </div>
-        {showSaved && (
-          <span
-            className="text-sm animate-fade-in"
-            style={{ color: 'var(--color-accent)' }}
-          >
-            Sauvegard\u00e9
-          </span>
-        )}
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
-        {/* Ton preference section */}
-        <section className="space-y-4">
-          <h2 className="text-white font-medium text-base">Style de coaching</h2>
+      <div className="max-w-3xl mx-auto px-6 space-y-6">
+        {/* Coaching style section */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            Style de coaching
+          </h2>
           <div className="grid grid-cols-3 gap-3">
-            {tonOptions.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => handleTonChange(option.value)}
-                className="glass p-4 rounded-xl text-left transition-all"
-                style={{
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor:
-                    profile.preferences.ton === option.value
-                      ? 'var(--color-accent)'
-                      : 'var(--color-glass-border)',
-                  backgroundColor:
-                    profile.preferences.ton === option.value
-                      ? 'rgba(245, 158, 11, 0.1)'
-                      : 'var(--color-glass)',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-4 h-4 rounded-full border-2 flex items-center justify-center"
-                    style={{
-                      borderColor:
-                        profile.preferences.ton === option.value
-                          ? 'var(--color-accent)'
-                          : 'rgba(255,255,255,0.3)',
-                    }}
-                  >
-                    {profile.preferences.ton === option.value && (
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: 'var(--color-accent)' }}
-                      />
-                    )}
+            {tonOptions.map((option) => {
+              const isSelected = profile.preferences.ton === option.value;
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => handleTonChange(option.value)}
+                  className={`p-5 rounded-2xl text-left transition-all duration-200 border-2 ${
+                    isSelected
+                      ? 'border-teal-500 bg-teal-50 shadow-sm'
+                      : 'border-gray-200 bg-white hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        isSelected
+                          ? 'border-teal-500'
+                          : 'border-gray-400'
+                      }`}
+                    >
+                      {isSelected && (
+                        <div className="w-2 h-2 rounded-full bg-teal-500" />
+                      )}
+                    </div>
+                    <span
+                      className={`text-sm font-semibold ${
+                        isSelected
+                          ? 'text-teal-600'
+                          : 'text-gray-800'
+                      }`}
+                    >
+                      {option.label}
+                    </span>
                   </div>
-                  <span
-                    className="text-sm font-medium"
-                    style={{
-                      color:
-                        profile.preferences.ton === option.value
-                          ? 'var(--color-accent)'
-                          : 'rgba(255,255,255,0.7)',
-                    }}
-                  >
-                    {option.label}
-                  </span>
-                </div>
-                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {option.description}
-                </p>
-              </button>
-            ))}
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    {option.description}
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </section>
 
         {/* Profile sections */}
         <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Ton profil
+          </h2>
           {profileSections.map(({ key, label }) => (
-            <div key={key} className="glass rounded-xl p-4 space-y-3">
-              <h3 className="text-white font-medium text-sm">{label}</h3>
+            <div
+              key={key}
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3"
+            >
+              <h3 className="text-gray-800 font-medium text-sm">
+                {label}
+              </h3>
               <EditableList
                 items={(profile[key] as string[]) || []}
                 onUpdate={(items) => handleUpdate(key, items)}
-                placeholder={`Ajouter un \u00e9l\u00e9ment...`}
+                placeholder="Ajouter un élément..."
               />
             </div>
           ))}
@@ -394,11 +378,13 @@ export default function SettingsPage() {
 
         {/* Sources section */}
         <section className="space-y-4">
-          <h2 className="text-white font-medium text-base">Biblioth\u00e8que de sources</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            Bibliothèque de sources
+          </h2>
           {sources.length === 0 ? (
-            <div className="glass rounded-xl p-6 text-center">
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Aucune source index\u00e9e
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+              <p className="text-sm text-gray-400">
+                Aucune source indexée
               </p>
             </div>
           ) : (
@@ -406,22 +392,18 @@ export default function SettingsPage() {
               {sources.map((source) => (
                 <div
                   key={source.id}
-                  className="glass rounded-xl p-4 flex items-center justify-between"
+                  className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-center justify-between"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-white text-sm font-medium truncate">{source.titre}</h3>
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                          color: 'var(--color-accent)',
-                        }}
-                      >
+                      <h3 className="text-gray-800 text-sm font-medium truncate">
+                        {source.titre}
+                      </h3>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full shrink-0 bg-teal-50 text-teal-600 font-medium">
                         {source.chunks_count} chunks
                       </span>
                     </div>
-                    <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    <p className="text-xs text-gray-400 mt-1">
                       {source.auteur} &middot; {source.domaine}
                     </p>
                   </div>
@@ -429,26 +411,23 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2 ml-4 shrink-0">
                       <button
                         onClick={() => handleToggleSource(source.id, !source.active)}
-                        className="p-2 rounded-lg transition-colors hover:bg-white/5"
-                        title={source.active ? 'D\u00e9sactiver' : 'Activer'}
+                        className="p-2 rounded-lg transition-colors hover:bg-gray-50"
+                        title={source.active ? 'Désactiver' : 'Activer'}
                       >
                         <div
-                          className="w-8 h-5 rounded-full relative transition-colors"
-                          style={{
-                            backgroundColor: source.active
-                              ? 'var(--color-accent)'
-                              : 'rgba(255,255,255,0.15)',
-                          }}
+                          className={`w-9 h-5 rounded-full relative transition-colors ${
+                            source.active ? 'bg-teal-500' : 'bg-gray-200'
+                          }`}
                         >
                           <div
-                            className="w-3.5 h-3.5 rounded-full bg-white absolute top-[3px] transition-all"
-                            style={{ left: source.active ? '15px' : '3px' }}
+                            className="w-3.5 h-3.5 rounded-full bg-white absolute top-[3px] transition-all shadow-sm"
+                            style={{ left: source.active ? '17px' : '3px' }}
                           />
                         </div>
                       </button>
                       <button
                         onClick={() => handleDeleteSource(source.id)}
-                        className="p-2 rounded-lg transition-colors hover:bg-red-500/10 text-red-400"
+                        className="p-2 rounded-lg transition-colors hover:bg-red-50 text-red-500"
                         title="Supprimer"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -466,14 +445,13 @@ export default function SettingsPage() {
         {/* Upload PDF section (admin only) */}
         {isAdmin && (
           <section className="space-y-4">
-            <h2 className="text-white font-medium text-base">Ajouter un livre</h2>
-            <div className="glass rounded-xl p-4 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-800">
+              Ajouter un livre
+            </h2>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
               {/* File drop zone */}
               <label
-                className="block rounded-xl p-6 text-center cursor-pointer transition-colors hover:bg-white/5"
-                style={{
-                  border: '2px dashed var(--color-glass-border)',
-                }}
+                className="block rounded-xl p-6 text-center cursor-pointer transition-colors border-2 border-dashed border-gray-300 hover:border-teal-400 hover:bg-teal-50/30"
               >
                 <input
                   type="file"
@@ -484,41 +462,41 @@ export default function SettingsPage() {
                 {uploadFile ? (
                   <div className="space-y-1">
                     <svg
-                      className="mx-auto mb-2"
+                      className="mx-auto mb-2 text-teal-600"
                       width="24"
                       height="24"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
-                      style={{ color: 'var(--color-accent)' }}
                     >
                       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                       <polyline points="14 2 14 8 20 8" />
                     </svg>
-                    <p className="text-sm text-white">{uploadFile.name}</p>
-                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    <p className="text-sm text-gray-800 font-medium">
+                      {uploadFile.name}
+                    </p>
+                    <p className="text-xs text-gray-400">
                       {(uploadFile.size / 1024 / 1024).toFixed(1)} Mo
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-1">
                     <svg
-                      className="mx-auto mb-2"
+                      className="mx-auto mb-2 text-gray-400"
                       width="24"
                       height="24"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
-                      style={{ color: 'rgba(255,255,255,0.3)' }}
                     >
                       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
                       <polyline points="17 8 12 3 7 8" />
                       <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                      Cliquez pour s\u00e9lectionner un PDF
+                    <p className="text-sm text-gray-400">
+                      Cliquez pour sélectionner un PDF
                     </p>
                   </div>
                 )}
@@ -531,45 +509,21 @@ export default function SettingsPage() {
                   value={uploadTitre}
                   onChange={(e) => setUploadTitre(e.target.value)}
                   placeholder="Titre du livre"
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder:text-white/30 outline-none transition-colors"
-                  style={{
-                    backgroundColor: 'var(--color-bg-secondary, rgba(255,255,255,0.06))',
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: 'var(--color-glass-border)',
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = 'var(--color-accent)')}
-                  onBlur={(e) => (e.target.style.borderColor = 'var(--color-glass-border)')}
+                  className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none transition-all focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                 />
                 <input
                   type="text"
                   value={uploadAuteur}
                   onChange={(e) => setUploadAuteur(e.target.value)}
                   placeholder="Auteur"
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder:text-white/30 outline-none transition-colors"
-                  style={{
-                    backgroundColor: 'var(--color-bg-secondary, rgba(255,255,255,0.06))',
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: 'var(--color-glass-border)',
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = 'var(--color-accent)')}
-                  onBlur={(e) => (e.target.style.borderColor = 'var(--color-glass-border)')}
+                  className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none transition-all focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                 />
                 <input
                   type="text"
                   value={uploadDomaine}
                   onChange={(e) => setUploadDomaine(e.target.value)}
-                  placeholder="Domaine (ex: PNL, coaching, d\u00e9veloppement personnel)"
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder:text-white/30 outline-none transition-colors"
-                  style={{
-                    backgroundColor: 'var(--color-bg-secondary, rgba(255,255,255,0.06))',
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: 'var(--color-glass-border)',
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = 'var(--color-accent)')}
-                  onBlur={(e) => (e.target.style.borderColor = 'var(--color-glass-border)')}
+                  placeholder="Domaine (ex: PNL, coaching, développement personnel)"
+                  className="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none transition-all focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                 />
               </div>
 
@@ -577,11 +531,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleUpload}
                 disabled={!uploadFile || !uploadTitre || !uploadAuteur || !uploadDomaine || !!uploadStatus}
-                className="w-full py-3 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
-                style={{
-                  background: 'linear-gradient(135deg, var(--color-accent), #d97706)',
-                  color: '#0f0d0a',
-                }}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-white bg-teal-600 transition-all hover:bg-teal-700 active:scale-[0.98] disabled:opacity-40 disabled:hover:bg-teal-600"
               >
                 {uploadStatus || 'Indexer'}
               </button>
@@ -591,21 +541,20 @@ export default function SettingsPage() {
 
         {/* Account section */}
         <section className="space-y-4">
-          <div className="glass rounded-xl p-4 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Compte
+          </h2>
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
             {session?.user?.email && (
               <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--color-accent), #d97706)',
-                    color: '#0f0d0a',
-                  }}
-                >
+                <div className="w-11 h-11 rounded-full bg-teal-600 flex items-center justify-center text-sm font-semibold text-white">
                   {session.user.email[0].toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-white text-sm">{session.user.email}</p>
-                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <p className="text-gray-800 text-sm font-medium">
+                    {session.user.email}
+                  </p>
+                  <p className="text-xs text-gray-400">
                     {isAdmin ? 'Administrateur' : 'Utilisateur'}
                   </p>
                 </div>
@@ -613,13 +562,9 @@ export default function SettingsPage() {
             )}
             <button
               onClick={() => signOut({ callbackUrl: '/' })}
-              className="w-full py-3 rounded-xl text-sm font-medium transition-colors hover:bg-red-500/10"
-              style={{
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#ef4444',
-              }}
+              className="w-full py-3 rounded-xl text-sm font-medium transition-colors border border-red-300 text-red-500 hover:bg-red-50 active:scale-[0.98]"
             >
-              Se d\u00e9connecter
+              Se déconnecter
             </button>
           </div>
         </section>

@@ -41,47 +41,32 @@ export default function SessionsPage() {
   };
 
   return (
-    <div className="min-h-screen relative z-10 pb-20">
+    <div className="min-h-screen bg-stone-50 relative z-10 pb-24">
       {/* Header */}
-      <div className="glass backdrop-blur-xl sticky top-0 z-20 border-b border-[var(--color-glass-border)]">
-        <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <button
-            onClick={() => router.push('/')}
-            className="w-10 h-10 rounded-xl glass glass-hover flex items-center justify-center border border-[var(--color-glass-border)] transition-all spring"
-          >
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-text-secondary)"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            Sessions
+      <div className="pt-20 max-w-3xl mx-auto px-6">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-800">
+            Mes sessions
           </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Ton historique de conversations
+          </p>
         </div>
-      </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6">
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-20">
             <div className="flex gap-1.5">
               <div
-                className="w-2.5 h-2.5 rounded-full bg-[var(--color-accent)] animate-pulse"
+                className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse"
                 style={{ animationDelay: '0ms' }}
               />
               <div
-                className="w-2.5 h-2.5 rounded-full bg-[var(--color-accent)] animate-pulse"
+                className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse"
                 style={{ animationDelay: '200ms' }}
               />
               <div
-                className="w-2.5 h-2.5 rounded-full bg-[var(--color-accent)] animate-pulse"
+                className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse"
                 style={{ animationDelay: '400ms' }}
               />
             </div>
@@ -91,25 +76,23 @@ export default function SessionsPage() {
         {/* Empty State */}
         {!loading && sessions.length === 0 && (
           <div className="flex items-center justify-center py-20 animate-fade-in">
-            <div className="glass rounded-2xl border border-[var(--color-glass-border)] p-8 text-center max-w-xs">
-              <div className="w-14 h-14 rounded-2xl bg-[var(--color-accent-soft)] flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-7 h-7"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--color-accent)"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center max-w-xs">
+              <div className="w-14 h-14 rounded-2xl bg-teal-50 flex items-center justify-center mx-auto mb-4">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                    stroke="currentColor"
+                    className="text-teal-600"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </div>
-              <p className="text-[var(--color-text-primary)] font-semibold mb-1">
+              <p className="text-gray-800 font-semibold mb-1">
                 Aucune session
               </p>
-              <p className="text-[var(--color-text-muted)] text-sm">
+              <p className="text-gray-400 text-sm">
                 Tes conversations apparaîtront ici.
               </p>
             </div>
@@ -132,23 +115,23 @@ export default function SessionsPage() {
                   {/* Session Card */}
                   <button
                     onClick={() => toggleExpand(s.id)}
-                    className="w-full glass glass-hover rounded-2xl border border-[var(--color-glass-border)] p-4 text-left transition-all spring"
+                    className="w-full bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-left transition-all duration-200 hover:shadow-md"
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3.5">
                       {/* Mode Icon */}
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
                           isDeblocage
-                            ? 'bg-[var(--color-accent-soft)]'
-                            : 'bg-rose-500/10'
+                            ? 'bg-teal-50'
+                            : 'bg-rose-50'
                         }`}
                       >
                         {isDeblocage ? (
                           <svg
-                            className="w-5 h-5"
+                            className="w-5 h-5 text-teal-600"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="var(--color-accent)"
+                            stroke="currentColor"
                             strokeWidth={2}
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -157,10 +140,10 @@ export default function SessionsPage() {
                           </svg>
                         ) : (
                           <svg
-                            className="w-5 h-5"
+                            className="w-5 h-5 text-rose-500"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="#f43f5e"
+                            stroke="currentColor"
                             strokeWidth={2}
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -173,27 +156,27 @@ export default function SessionsPage() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-[var(--color-text-primary)] font-medium text-sm">
+                          <p className="text-gray-800 font-semibold text-[15px]">
                             {isDeblocage ? 'Déblocage' : 'Journal'}
                           </p>
                           <div className="flex-1" />
                           {s.themes.slice(0, 2).map((theme, idx) => (
                             <span
                               key={idx}
-                              className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)] truncate max-w-[100px]"
+                              className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-600 font-medium truncate max-w-[100px]"
                             >
                               {theme}
                             </span>
                           ))}
                         </div>
-                        <p className="text-[var(--color-text-muted)] text-xs mt-0.5">
+                        <p className="text-gray-400 text-sm mt-0.5">
                           {formatDate(s.date)}
                         </p>
                       </div>
 
                       {/* Expand chevron */}
                       <svg
-                        className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform duration-200 shrink-0 mt-1 ${
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0 mt-1 ${
                           isExpanded ? 'rotate-180' : ''
                         }`}
                         viewBox="0 0 24 24"
@@ -210,52 +193,55 @@ export default function SessionsPage() {
 
                   {/* Expanded Content */}
                   {isExpanded && (
-                    <div className="mt-2 glass rounded-2xl border border-[var(--color-glass-border)] p-4 animate-fade-in">
+                    <div className="mt-2 bg-white rounded-2xl border border-gray-200 p-5 animate-fade-in">
                       {/* Messages */}
                       {s.messages.length > 0 ? (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-4">
                           {s.messages.map((msg) => (
                             <div key={msg.id} className="flex flex-col gap-1">
                               <span
-                                className={`text-xs font-medium ${
+                                className={`text-xs font-semibold tracking-wide uppercase ${
                                   msg.role === 'user'
-                                    ? 'text-[var(--color-accent)]'
-                                    : 'text-[var(--color-text-muted)]'
+                                    ? 'text-teal-600'
+                                    : 'text-gray-400'
                                 }`}
                               >
                                 {msg.role === 'user' ? 'Toi' : 'Coach'}
                               </span>
-                              <p className="text-[var(--color-text-secondary)] text-sm leading-relaxed">
+                              <p className="text-gray-600 text-sm leading-relaxed">
                                 {msg.content}
                               </p>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[var(--color-text-muted)] text-sm text-center py-2">
+                        <p className="text-gray-400 text-sm text-center py-2">
                           Pas de messages enregistrés.
                         </p>
                       )}
 
                       {/* Insights */}
                       {s.insights.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-[var(--color-glass-border)]">
-                          <p className="text-xs font-medium text-[var(--color-accent)] mb-2">
+                        <div className="mt-5 pt-4 border-t border-gray-200">
+                          <p className="text-xs font-semibold text-teal-600 mb-3 uppercase tracking-wide">
                             Insights
                           </p>
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-col gap-2">
                             {s.insights.map((insight, idx) => (
-                              <p
+                              <div
                                 key={idx}
-                                className={`text-sm ${
-                                  insight.isBreakthrough
-                                    ? 'text-[var(--color-accent)] font-medium'
-                                    : 'text-[var(--color-text-secondary)]'
-                                }`}
+                                className="flex items-start gap-2.5 pl-3 border-l-2 border-teal-500"
                               >
-                                {insight.isBreakthrough && '★ '}
-                                {insight.text}
-                              </p>
+                                <p
+                                  className={`text-sm leading-relaxed ${
+                                    insight.isBreakthrough
+                                      ? 'text-teal-600 font-medium'
+                                      : 'text-gray-600'
+                                  }`}
+                                >
+                                  {insight.text}
+                                </p>
+                              </div>
                             ))}
                           </div>
                         </div>

@@ -3,18 +3,18 @@
 export default function AnimatedBackground() {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
-      {/* Amber orb — top left */}
+      {/* Teal wash -- top left */}
       <div
-        className="absolute -top-[40%] -left-[20%] w-[70%] h-[70%] rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.07)_0%,transparent_70%)] animate-float"
+        className="absolute -top-[35%] -left-[15%] w-[65%] h-[65%] rounded-full bg-[radial-gradient(circle,rgba(74,158,143,0.04)_0%,transparent_70%)] animate-float"
       />
-      {/* Rose orb — bottom right */}
+      {/* Cream wash -- bottom right */}
       <div
-        className="absolute -bottom-[30%] -right-[20%] w-[60%] h-[60%] rounded-full bg-[radial-gradient(circle,rgba(244,63,94,0.05)_0%,transparent_70%)] animate-float"
+        className="absolute -bottom-[25%] -right-[15%] w-[55%] h-[55%] rounded-full bg-[radial-gradient(circle,rgba(242,240,236,0.5)_0%,transparent_70%)] animate-float"
         style={{ animationDelay: '-3s' }}
       />
-      {/* Orange orb — mid right */}
+      {/* Teal hint -- mid center */}
       <div
-        className="absolute top-[20%] right-[10%] w-[40%] h-[40%] rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.04)_0%,transparent_70%)] animate-float"
+        className="absolute top-[25%] right-[5%] w-[40%] h-[40%] rounded-full bg-[radial-gradient(circle,rgba(74,158,143,0.03)_0%,transparent_70%)] animate-float"
         style={{ animationDelay: '-5s' }}
       />
     </div>

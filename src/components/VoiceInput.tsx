@@ -101,7 +101,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
     <div className="flex flex-col items-center">
       {/* Transcription en cours */}
       {isRecording && transcript && (
-        <div className="mb-3 px-4 py-2 rounded-xl bg-[var(--color-glass)] backdrop-blur-xl border border-[var(--color-glass-border)] text-sm text-[var(--color-text-secondary)] max-w-full overflow-hidden animate-fade-in">
+        <div className="mb-3 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm text-gray-500 max-w-full overflow-hidden animate-fade-in shadow-sm">
           <p className="line-clamp-3">{transcript}</p>
         </div>
       )}
@@ -110,21 +110,21 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
       <button
         onClick={toggleRecording}
         disabled={disabled}
-        className={`w-12 h-12 rounded-full flex items-center justify-center spring cursor-pointer ${
+        className={`w-11 h-11 rounded-full flex items-center justify-center transition-all cursor-pointer ${
           isRecording
-            ? 'bg-rose-500 mic-recording'
-            : 'bg-[linear-gradient(135deg,var(--color-gradient-start),var(--color-gradient-end))] hover:brightness-110 shadow-lg shadow-[var(--color-accent-soft)]'
+            ? 'bg-red-500 mic-recording'
+            : 'bg-teal-600 hover:bg-teal-700'
         } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
         aria-label={isRecording ? 'Arreter' : 'Parler'}
       >
         {isRecording ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
             <rect x="6" y="6" width="12" height="12" rx="2" />
           </svg>
         ) : (
           <svg
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="white"
@@ -141,7 +141,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
       </button>
 
       {isRecording && (
-        <span className="mt-2 text-xs text-[var(--color-accent)] animate-pulse-warm">
+        <span className="mt-2 text-xs text-red-500 animate-pulse font-medium">
           Enregistrement...
         </span>
       )}

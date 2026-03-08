@@ -15,73 +15,67 @@ export default function HomePage() {
   }, []);
 
   const firstName = session?.user?.name?.split(' ')[0];
+  const greeting = isEvening ? 'Bonsoir' : 'Bonjour';
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 pb-20 relative z-10">
-      {/* Logo */}
-      <div className="animate-fade-in mb-6">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--color-accent-soft)] border border-[var(--color-glass-border)] backdrop-blur-xl flex items-center justify-center">
-          <svg
-            className="w-8 h-8"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--color-accent)"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
+    <div className="min-h-screen bg-stone-50">
+      <NavBar active="home" />
+
+      <main className="pt-20 pb-16 px-6 max-w-2xl mx-auto">
+        {/* Greeting */}
+        <div className="mt-10 mb-12 animate-fade-in">
+          <div className="flex items-center gap-3 mb-2">
+            {/* Small leaf icon */}
+            <svg
+              width={24}
+              height={24}
+              viewBox="0 0 24 24"
+              fill="none"
+              className="text-teal-600 opacity-60"
+            >
+              <path
+                d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20c4 0 8.5-3 9-8 .5-5-2-8-2-8s-1 1-5 3"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M11 12c1-1.5 3-3.5 6-4"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <h1 className="text-2xl font-semibold text-gray-800">
+              {firstName ? `${greeting}, ${firstName}` : greeting}
+            </h1>
+          </div>
+          <p className="text-gray-500 text-[15px] leading-relaxed">
+            Qu&apos;est-ce qu&apos;on travaille aujourd&apos;hui&#8239;?
+          </p>
         </div>
-      </div>
 
-      {/* Title */}
-      <h1
-        className="text-4xl font-bold gradient-text animate-fade-in mb-2"
-        style={{ animationDelay: '100ms' }}
-      >
-        Inner Coach
-      </h1>
-
-      {/* Subtitle */}
-      <p
-        className="text-[var(--color-text-muted)] text-lg mb-2 animate-fade-in"
-        style={{ animationDelay: '200ms' }}
-      >
-        Ton espace. Ton rythme.
-      </p>
-
-      {/* Greeting */}
-      {firstName && (
-        <p
-          className="text-[var(--color-text-secondary)] text-base mb-8 animate-fade-in"
-          style={{ animationDelay: '300ms' }}
-        >
-          Bonjour, {firstName}
-        </p>
-      )}
-      {!firstName && <div className="mb-8" />}
-
-      {/* Mode Cards */}
-      <div className="w-full max-w-sm flex flex-col gap-4">
-        {/* Deblocage */}
-        <button
-          onClick={() => router.push('/session?mode=deblocage')}
-          className={`glass glass-hover rounded-2xl border p-5 text-left transition-all spring animate-fade-in ${
-            !isEvening
-              ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-              : 'border-[var(--color-glass-border)]'
-          }`}
-          style={{ animationDelay: '400ms' }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[var(--color-accent-soft)] flex items-center justify-center shrink-0">
+        {/* Mode Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* Deblocage */}
+          <button
+            onClick={() => router.push('/session?mode=deblocage')}
+            className={`group bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left transition-all duration-200 animate-fade-in hover:shadow-md hover:border-teal-500 cursor-pointer ${
+              !isEvening ? 'border-l-4 border-l-teal-500' : ''
+            }`}
+            style={{ animationDelay: '100ms' }}
+          >
+            {/* Icon */}
+            <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center mb-4">
               <svg
-                className="w-6 h-6"
+                width={20}
+                height={20}
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--color-accent)"
+                className="text-teal-600"
+                stroke="currentColor"
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -89,34 +83,31 @@ export default function HomePage() {
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
             </div>
-            <div>
-              <p className="text-[var(--color-text-primary)] font-semibold text-lg">
-                J&apos;ai quelque chose à dire
-              </p>
-              <p className="text-[var(--color-text-muted)] text-sm mt-0.5">
-                Déblocage guidé
-              </p>
-            </div>
-          </div>
-        </button>
+            <p className="text-gray-800 font-semibold text-base mb-1">
+              J&apos;ai quelque chose à dire
+            </p>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Déblocage guidé
+            </p>
+          </button>
 
-        {/* Journal */}
-        <button
-          onClick={() => router.push('/session?mode=journal')}
-          className={`glass glass-hover rounded-2xl border p-5 text-left transition-all spring animate-fade-in ${
-            isEvening
-              ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-              : 'border-[var(--color-glass-border)]'
-          }`}
-          style={{ animationDelay: '500ms' }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[var(--color-accent-soft)] flex items-center justify-center shrink-0">
+          {/* Journal */}
+          <button
+            onClick={() => router.push('/session?mode=journal')}
+            className={`group bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left transition-all duration-200 animate-fade-in hover:shadow-md hover:border-teal-500 cursor-pointer ${
+              isEvening ? 'border-l-4 border-l-teal-500' : ''
+            }`}
+            style={{ animationDelay: '200ms' }}
+          >
+            {/* Icon */}
+            <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center mb-4">
               <svg
-                className="w-6 h-6"
+                width={20}
+                height={20}
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--color-accent)"
+                className="text-teal-600"
+                stroke="currentColor"
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -124,19 +115,15 @@ export default function HomePage() {
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
-            <div>
-              <p className="text-[var(--color-text-primary)] font-semibold text-lg">
-                Raconter ma journée
-              </p>
-              <p className="text-[var(--color-text-muted)] text-sm mt-0.5">
-                Journal du soir
-              </p>
-            </div>
-          </div>
-        </button>
-      </div>
-
-      <NavBar active="home" />
+            <p className="text-gray-800 font-semibold text-base mb-1">
+              Raconter ma journée
+            </p>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Journal du soir
+            </p>
+          </button>
+        </div>
+      </main>
     </div>
   );
 }

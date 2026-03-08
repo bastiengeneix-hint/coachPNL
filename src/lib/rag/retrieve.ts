@@ -6,11 +6,15 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 
 function getOpenAI() {
-  return new OpenAI();
+  return new OpenAI({
+    apiKey: process.env.INNER_COACH_OPENAI_KEY || process.env.OPENAI_API_KEY,
+  });
 }
 
 function getAnthropic() {
-  return new Anthropic();
+  return new Anthropic({
+    apiKey: process.env.INNER_COACH_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY,
+  });
 }
 
 interface RAGPassage {

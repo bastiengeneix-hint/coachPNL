@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { createServerClient } from '@/lib/supabase/server';
 import { ingestPDF } from '@/lib/rag/ingest';
 
+// Allow up to 5 minutes for large PDF ingestion
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -60,15 +63,11 @@ export async function POST(request: NextRequest) {
 
     const { chunksCount } = await ingestPDF(buffer, source.id);
 
-    // Update chunks_count on the source record
-    await supabase
-      .from('sources')
-      .update({ chunks_count: chunksCount })
-      .eq('id', source.id);
-
-    return NextResponse.json({ source, chunksCount });
+    // ingestPDF already updates chunks_count via storeChunks, just return
+    return NextResponse.json({ source: { ...source, chunks_count: chunksCount }, chunksCount });
   } catch (error) {
     console.error('Upload POST error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

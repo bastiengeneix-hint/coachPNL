@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
-/* ─── Types ───────────────────────────────────────────── */
+/* --- Types ------------------------------------------------- */
 
 type Ton = 'direct' | 'doux' | 'mix';
 
@@ -44,20 +44,20 @@ const TON_OPTIONS: { value: Ton; title: string; description: string }[] = [
   },
 ];
 
-/* ─── Progress Dots ───────────────────────────────────── */
+/* --- Progress Dots ----------------------------------------- */
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex items-center justify-center gap-2">
+    <div className="flex items-center justify-center gap-2.5">
       {Array.from({ length: total }, (_, i) => (
         <div
           key={i}
-          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+          className={`h-2 rounded-full transition-all duration-300 ${
             i + 1 === current
-              ? 'bg-[var(--color-accent)] w-6'
+              ? 'bg-teal-500 w-7'
               : i + 1 < current
-                ? 'bg-[var(--color-accent)] opacity-40'
-                : 'bg-[var(--color-text-muted)] opacity-30'
+                ? 'bg-teal-500 w-2 opacity-50'
+                : 'bg-gray-300 w-2 opacity-30'
           }`}
         />
       ))}
@@ -65,7 +65,7 @@ function ProgressDots({ current, total }: { current: number; total: number }) {
   );
 }
 
-/* ─── Spinner ─────────────────────────────────────────── */
+/* --- Spinner ----------------------------------------------- */
 
 function Spinner() {
   return (
@@ -87,7 +87,7 @@ function Spinner() {
   );
 }
 
-/* ─── Page ────────────────────────────────────────────── */
+/* --- Page -------------------------------------------------- */
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -201,33 +201,24 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-[var(--color-bg-primary)] flex flex-col">
-      {/* Background orbs */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-[40%] -left-[20%] w-[70%] h-[70%] rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.07)_0%,transparent_70%)] animate-float" />
-        <div
-          className="absolute -bottom-[30%] -right-[20%] w-[60%] h-[60%] rounded-full bg-[radial-gradient(circle,rgba(244,63,94,0.05)_0%,transparent_70%)] animate-float"
-          style={{ animationDelay: '-3s' }}
-        />
-      </div>
-
+    <div className="min-h-dvh bg-stone-50 flex flex-col">
       {/* Progress */}
-      <div className="pt-8 pb-4 px-6">
+      <div className="pt-10 pb-6 px-6">
         <ProgressDots current={step} total={4} />
       </div>
 
       {/* Step content */}
-      <div className="flex-1 flex items-center justify-center px-6 pb-6">
-        <div className="w-full max-w-md">
-          {/* ─── Step 1: Name ─────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center px-6 pb-8">
+        <div className="w-full max-w-lg">
+          {/* --- Step 1: Name -------------------------------- */}
           {step === 1 && (
             <div className="animate-fade-in">
-              <div className="glass p-6 space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 space-y-6">
                 <div className="text-center space-y-2">
-                  <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-2xl font-semibold text-gray-800">
                     Comment tu t&apos;appelles ?
                   </h2>
-                  <p className="text-sm text-[var(--color-text-muted)]">
+                  <p className="text-sm text-gray-500">
                     Pour que ton coach sache comment t&apos;appeler
                   </p>
                 </div>
@@ -239,21 +230,21 @@ export default function OnboardingPage() {
                   onKeyDown={(e) => e.key === 'Enter' && goNext()}
                   placeholder="Ton prénom"
                   autoFocus
-                  className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border-custom)] rounded-xl px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-center text-lg"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-5 text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:bg-white transition-all text-center"
                 />
               </div>
             </div>
           )}
 
-          {/* ─── Step 2: Projects ─────────────────────────── */}
+          {/* --- Step 2: Projects --------------------------- */}
           {step === 2 && (
             <div className="animate-fade-in">
-              <div className="glass p-6 space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 space-y-6">
                 <div className="text-center space-y-2">
-                  <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-2xl font-semibold text-gray-800">
                     Quels sont tes projets actuels ?
                   </h2>
-                  <p className="text-sm text-[var(--color-text-muted)]">
+                  <p className="text-sm text-gray-500">
                     Perso, pro, side-projects... tout compte
                   </p>
                 </div>
@@ -266,13 +257,13 @@ export default function OnboardingPage() {
                     onChange={(e) => setProjetInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addProjet()}
                     placeholder="Ex : lancer mon podcast"
-                    className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border-custom)] rounded-xl px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-5 text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:bg-white transition-all"
                   />
                   <button
                     type="button"
                     onClick={addProjet}
                     disabled={!projetInput.trim()}
-                    className="px-4 py-3 rounded-xl bg-[var(--color-accent)] text-white text-sm font-medium disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed spring"
+                    className="px-5 py-3.5 rounded-xl bg-teal-600 text-white text-sm font-medium disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed transition-all hover:bg-teal-700 active:scale-[0.98]"
                   >
                     Ajouter
                   </button>
@@ -284,13 +275,13 @@ export default function OnboardingPage() {
                     {data.projets.map((projet, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--color-accent-soft)] text-sm text-[var(--color-accent)] animate-fade-in"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-teal-50 text-sm font-medium text-teal-700 border border-teal-200 animate-fade-in"
                       >
                         {projet}
                         <button
                           type="button"
                           onClick={() => removeProjet(i)}
-                          className="hover:text-[var(--color-error)] transition-colors cursor-pointer"
+                          className="hover:text-red-500 transition-colors cursor-pointer"
                         >
                           <svg
                             width="14"
@@ -312,16 +303,16 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ─── Step 3: Blocages ─────────────────────────── */}
+          {/* --- Step 3: Blocages --------------------------- */}
           {step === 3 && (
             <div className="animate-fade-in">
-              <div className="glass p-6 space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 space-y-6">
                 <div className="text-center space-y-2">
-                  <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-2xl font-semibold text-gray-800">
                     Qu&apos;est-ce qui te bloque le plus souvent ?
                   </h2>
-                  <p className="text-sm text-[var(--color-text-muted)]">
-                    Pas de jugement — c&apos;est pour mieux t&apos;accompagner
+                  <p className="text-sm text-gray-500">
+                    Pas de jugement &mdash; c&apos;est pour mieux t&apos;accompagner
                   </p>
                 </div>
 
@@ -333,18 +324,18 @@ export default function OnboardingPage() {
                         key={option}
                         type="button"
                         onClick={() => toggleBlocage(option)}
-                        className={`text-left px-4 py-3 rounded-xl border text-sm transition-all duration-200 cursor-pointer spring ${
+                        className={`text-left px-4 py-3.5 rounded-xl border-2 text-sm transition-all duration-200 cursor-pointer ${
                           isChecked
-                            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-                            : 'border-[var(--color-border-custom)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:border-[var(--color-glass-border)]'
+                            ? 'border-teal-500 bg-teal-50 text-teal-700'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
                         }`}
                       >
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2.5">
                           <span
-                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                            className={`w-4.5 h-4.5 w-[18px] h-[18px] rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
                               isChecked
-                                ? 'bg-[var(--color-accent)] border-[var(--color-accent)]'
-                                : 'border-[var(--color-text-muted)]'
+                                ? 'bg-teal-500 border-teal-500'
+                                : 'border-gray-300 bg-white'
                             }`}
                           >
                             {isChecked && (
@@ -375,19 +366,19 @@ export default function OnboardingPage() {
                     onChange={(e) => updateField('autreBlockage', e.target.value)}
                     placeholder="Précise ce qui te bloque..."
                     autoFocus
-                    className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border-custom)] rounded-xl px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors animate-fade-in"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-5 text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:bg-white transition-all animate-fade-in"
                   />
                 )}
               </div>
             </div>
           )}
 
-          {/* ─── Step 4: Tone preference ─────────────────── */}
+          {/* --- Step 4: Tone preference -------------------- */}
           {step === 4 && (
             <div className="animate-fade-in">
-              <div className="glass p-6 space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 space-y-6">
                 <div className="text-center space-y-2">
-                  <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-2xl font-semibold text-gray-800">
                     Comment préfères-tu qu&apos;on te parle ?
                   </h2>
                 </div>
@@ -400,35 +391,35 @@ export default function OnboardingPage() {
                         key={option.value}
                         type="button"
                         onClick={() => updateField('ton', option.value)}
-                        className={`w-full text-left p-4 rounded-xl border transition-all duration-200 cursor-pointer spring ${
+                        className={`w-full text-left p-5 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
                           isSelected
-                            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-                            : 'border-[var(--color-border-custom)] bg-[var(--color-glass)] hover:border-[var(--color-glass-border)]'
+                            ? 'border-teal-500 bg-teal-50'
+                            : 'border-gray-200 bg-white hover:border-gray-400'
                         }`}
                       >
                         <div className="flex items-start gap-3">
                           <span
                             className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                               isSelected
-                                ? 'border-[var(--color-accent)]'
-                                : 'border-[var(--color-text-muted)]'
+                                ? 'border-teal-500'
+                                : 'border-gray-400'
                             }`}
                           >
                             {isSelected && (
-                              <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
+                              <span className="w-2 h-2 rounded-full bg-teal-500" />
                             )}
                           </span>
                           <div>
                             <p
-                              className={`text-sm font-medium ${
+                              className={`text-sm font-semibold ${
                                 isSelected
-                                  ? 'text-[var(--color-accent)]'
-                                  : 'text-[var(--color-text-primary)]'
+                                  ? 'text-teal-600'
+                                  : 'text-gray-800'
                               }`}
                             >
                               {option.title}
                             </p>
-                            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                            <p className="text-sm text-gray-500 mt-0.5">
                               {option.description}
                             </p>
                           </div>
@@ -441,13 +432,13 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ─── Navigation buttons ──────────────────────── */}
+          {/* --- Navigation buttons ------------------------- */}
           <div className="flex items-center justify-between mt-8 gap-4">
             {step > 1 ? (
               <button
                 type="button"
                 onClick={goBack}
-                className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-medium bg-transparent text-[var(--color-accent)] border border-[var(--color-glass-border)] hover:bg-[var(--color-glass-hover)] spring cursor-pointer"
+                className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-medium bg-transparent text-teal-600 border border-teal-500 hover:bg-teal-50 transition-colors cursor-pointer"
               >
                 Précédent
               </button>
@@ -460,7 +451,7 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={goNext}
                 disabled={!canGoNext()}
-                className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white bg-[linear-gradient(135deg,var(--color-gradient-start),var(--color-gradient-end))] hover:brightness-110 active:brightness-95 shadow-lg shadow-[var(--color-accent-soft)] spring cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
               >
                 Suivant
               </button>
@@ -469,7 +460,7 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={handleComplete}
                 disabled={submitting}
-                className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-medium text-white bg-[linear-gradient(135deg,var(--color-gradient-start),var(--color-gradient-end))] hover:brightness-110 active:brightness-95 shadow-lg shadow-[var(--color-accent-soft)] spring cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
               >
                 {submitting ? (
                   <>
