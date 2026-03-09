@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 
 interface NavBarProps {
-  active: 'home' | 'sessions' | 'settings';
+  active: 'home' | 'exercices' | 'sessions' | 'settings';
 }
 
 export default function NavBar({ active }: NavBarProps) {
@@ -11,6 +11,7 @@ export default function NavBar({ active }: NavBarProps) {
 
   const items = [
     { key: 'home' as const, label: 'Accueil', path: '/' },
+    { key: 'exercices' as const, label: 'Exercices', path: '/exercices' },
     { key: 'sessions' as const, label: 'Sessions', path: '/sessions' },
     { key: 'settings' as const, label: 'Réglages', path: '/settings' },
   ];

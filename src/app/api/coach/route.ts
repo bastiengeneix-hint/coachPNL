@@ -5,7 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildSystemPrompt } from '@/lib/prompts/system-prompt';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
-import { SessionMode, Profile, ActiveContext } from '@/types';
+import { SessionMode, Profile, ActiveContext, ExerciseResult } from '@/types';
 
 function getAnthropicKey(): string {
   // Use INNER_COACH_ prefixed key first (avoids system env overrides like Claude Code)
@@ -92,7 +92,15 @@ export async function POST(req: NextRequest) {
           pending_exercice: null,
         };
 
-    // 7. RAG retrieval
+    // 7. Fetch recent exercise results
+    const { data: exerciseResults } = await supabase
+      .from('exercise_results')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('completed_at', { ascending: false })
+      .limit(5);
+
+    // 8. RAG retrieval
     const lastUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'user');
     const recentUserMessages = messages
       .filter((m: { role: string }) => m.role === 'user')
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
       ragPassages = await retrievePassages(lastUserMessage.content, recentUserMessages);
     }
 
-    // 8. Build system prompt
+    // 9. Build system prompt
     const systemPrompt = buildSystemPrompt({
       userName,
       profile: profileData,
@@ -112,9 +120,10 @@ export async function POST(req: NextRequest) {
       mode: mode as SessionMode,
       ragPassages,
       isFirstMessage,
+      exerciseResults: (exerciseResults || []) as unknown as ExerciseResult[],
     });
 
-    // 9. Call Anthropic
+    // 10. Call Anthropic
     const apiMessages =
       messages.length === 0
         ? [{ role: 'user' as const, content: 'Bonjour, je suis prêt pour cette session.' }]
@@ -130,7 +139,7 @@ export async function POST(req: NextRequest) {
       messages: apiMessages,
     });
 
-    // 10. Extract text response
+    // 11. Extract text response
     const textContent = response.content.find((block) => block.type === 'text');
     const messageText = textContent ? textContent.text : '';
 
