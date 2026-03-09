@@ -73,3 +73,19 @@ export interface RAGSource {
   chunks_count: number;
   indexed_at: string;
 }
+
+export interface ProfileEvolution {
+  add_croyances?: string[];
+  remove_croyances?: string[];
+  add_patterns?: string[];
+  remove_patterns?: string[];
+  add_projets?: string[];
+}
+
+export interface SessionAnalysis {
+  insights: SessionInsight[];
+  themes: string[];
+  exercice_propose: string | null;
+  summary: string;
+  profile_evolution: ProfileEvolution;
+}
