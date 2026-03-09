@@ -6,14 +6,15 @@ import { Session, SessionMode, Message } from '@/types';
 import {
   createSession,
   addMessage,
-  extractThemes,
   formatMessagesForAPI,
 } from '@/lib/coach/session-manager';
 import {
   saveSession,
   updateActiveContext,
   getRecentSessions,
+  evolveProfile,
 } from '@/lib/memory/store';
+import type { SessionAnalysis } from '@/types';
 import { buildActiveContext } from '@/lib/memory/context-builder';
 import CoachMessage from '@/components/CoachMessage';
 import VoiceInput from '@/components/VoiceInput';
@@ -146,16 +147,41 @@ function SessionContent() {
     }
   }, [input, isLoading, mode]);
 
-  // End session
+  // End session with AI analysis
   const handleEndSession = useCallback(async () => {
     if (!sessionRef.current) return;
 
     const currentSession = sessionRef.current;
-    const themes = extractThemes(currentSession.messages);
-    const finalSession: Session = {
-      ...currentSession,
-      themes,
-    };
+    setIsLoading(true);
+
+    let finalSession: Session = { ...currentSession };
+
+    try {
+      // Analyze session via Claude (extracts insights, themes, exercises, profile evolution)
+      const analyzeRes = await fetch('/api/sessions/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: currentSession.messages }),
+      });
+
+      if (analyzeRes.ok) {
+        const analysis: SessionAnalysis = await analyzeRes.json();
+        finalSession = {
+          ...finalSession,
+          insights: analysis.insights,
+          themes: analysis.themes,
+          exercice_propose: analysis.exercice_propose,
+          summary: analysis.summary,
+        };
+
+        // Evolve profile based on session analysis (non-blocking)
+        evolveProfile(analysis.profile_evolution).catch((err) =>
+          console.warn('Profile evolution error (non-blocking):', err)
+        );
+      }
+    } catch (error) {
+      console.warn('Session analysis error (non-blocking):', error);
+    }
 
     setSession(finalSession);
 
@@ -168,6 +194,7 @@ function SessionContent() {
       console.error('Error ending session:', error);
     }
 
+    setIsLoading(false);
     setIsEnded(true);
   }, []);
 

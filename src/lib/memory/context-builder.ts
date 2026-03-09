@@ -74,8 +74,24 @@ export function buildActiveContext(sessions: Session[]): ActiveContext {
     summaryParts.push(line);
   }
 
+  // Collecter tous les breakthroughs récents
+  const breakthroughs: string[] = [];
+  for (const session of sorted.slice(0, 5)) {
+    for (const insight of session.insights) {
+      if (insight.isBreakthrough) {
+        breakthroughs.push(insight.text);
+      }
+    }
+  }
+
+  // Ajouter les breakthroughs au résumé
+  let fullSummary = summaryParts.join('\n');
+  if (breakthroughs.length > 0) {
+    fullSummary += `\n\nPrises de conscience majeures récentes :\n${breakthroughs.map((b) => `- ${b}`).join('\n')}`;
+  }
+
   return {
-    summary: summaryParts.join('\n'),
+    summary: fullSummary,
     last_updated: new Date().toISOString(),
     recent_themes: recentThemes,
     pending_exercice: pendingExercice,

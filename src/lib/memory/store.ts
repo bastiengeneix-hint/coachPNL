@@ -1,6 +1,6 @@
 'use client';
 
-import { Session, Profile, ActiveContext } from '@/types';
+import { Session, Profile, ActiveContext, ProfileEvolution } from '@/types';
 
 // --- Sessions ---
 
@@ -70,6 +70,29 @@ export async function updateActiveContext(context: ActiveContext): Promise<void>
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'Erreur lors de la mise à jour du contexte');
+  }
+}
+
+// --- Profile Evolution ---
+
+export async function evolveProfile(evolution: ProfileEvolution): Promise<void> {
+  const hasChanges =
+    (evolution.add_croyances && evolution.add_croyances.length > 0) ||
+    (evolution.remove_croyances && evolution.remove_croyances.length > 0) ||
+    (evolution.add_patterns && evolution.add_patterns.length > 0) ||
+    (evolution.remove_patterns && evolution.remove_patterns.length > 0) ||
+    (evolution.add_projets && evolution.add_projets.length > 0);
+
+  if (!hasChanges) return;
+
+  const res = await fetch('/api/profile/evolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(evolution),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Erreur lors de l\'évolution du profil');
   }
 }
 
