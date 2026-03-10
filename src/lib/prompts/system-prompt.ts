@@ -1,4 +1,4 @@
-import { Profile, ActiveContext, SessionMode } from '@/types';
+import { Profile, ActiveContext, SessionMode, ExerciseResult } from '@/types';
 
 interface RAGPassage {
   livre: string;
@@ -160,6 +160,48 @@ C'est la fin de sa journée. Ouvre avec une question douce et contextuelle basé
   return parts.join('\n\n');
 }
 
+function buildExerciseBlock(userName: string, exerciseResults: ExerciseResult[]): string {
+  if (exerciseResults.length === 0) return '';
+
+  const EXERCISE_NAMES: Record<string, string> = {
+    roue_vie: 'Roue de la Vie',
+    triangle_equilibre: "Triangle d'Équilibre",
+    ikigai: 'IKIGAI',
+  };
+
+  const lines = exerciseResults.map((r) => {
+    const name = EXERCISE_NAMES[r.exercise_type] || r.exercise_type;
+    const date = new Date(r.completed_at);
+    const daysAgo = Math.round((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+    const timeLabel = daysAgo === 0 ? "aujourd'hui" : daysAgo === 1 ? 'hier' : `il y a ${daysAgo} jours`;
+
+    let line = `- ${name} (${timeLabel})`;
+
+    if (r.exercise_type === 'roue_vie' && r.data && 'axes' in r.data) {
+      const axes = r.data.axes as { label: string; score: number }[];
+      const sorted = [...axes].sort((a, b) => a.score - b.score);
+      line += ` : Points bas — ${sorted.slice(0, 2).map((a) => `${a.label} (${a.score}/10)`).join(', ')}`;
+    } else if (r.exercise_type === 'triangle_equilibre' && r.data && 'areas' in r.data) {
+      const areas = r.data.areas as { label: string; score: number }[];
+      line += ` : ${areas.map((a) => `${a.label} (${a.score}/10)`).join(', ')}`;
+    } else if (r.exercise_type === 'ikigai' && r.data) {
+      // Just mention the convergences from insights
+    }
+
+    if (r.insights.length > 0) {
+      line += `. Insight : "${r.insights[0]}"`;
+    }
+
+    return line;
+  });
+
+  return `## Résultats d'exercices récents
+
+${userName} a fait les exercices suivants récemment. Utilise ces résultats pour enrichir ton accompagnement — fais des liens naturels, ne les récite pas.
+
+${lines.join('\n')}`;
+}
+
 export function buildSystemPrompt(params: {
   userName: string;
   profile: Profile;
@@ -167,6 +209,7 @@ export function buildSystemPrompt(params: {
   mode: SessionMode;
   ragPassages: RAGPassage[];
   isFirstMessage: boolean;
+  exerciseResults?: ExerciseResult[];
 }): string {
   const ton = params.profile.preferences?.ton || 'mix';
 
@@ -174,6 +217,7 @@ export function buildSystemPrompt(params: {
     buildIdentityBlock(params.userName, ton as TonPreference),
     buildProfileBlock(params.userName, params.profile),
     buildContextBlock(params.activeContext),
+    buildExerciseBlock(params.userName, params.exerciseResults || []),
     buildRAGBlock(params.ragPassages, params.userName),
     buildModeBlock(params.mode, params.isFirstMessage),
   ];

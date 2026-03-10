@@ -74,6 +74,57 @@ export interface RAGSource {
   indexed_at: string;
 }
 
+// --- Exercise types ---
+
+export type ExerciseType = 'triangle_equilibre' | 'ikigai' | 'roue_vie';
+
+export interface ExerciseResult {
+  id: string;
+  exercise_type: ExerciseType;
+  data: TriangleEquilibreData | IkigaiData | RoueVieData;
+  insights: string[];
+  completed_at: string;
+}
+
+export interface TriangleEquilibreData {
+  areas: { label: string; score: number }[];
+  reflection: string;
+}
+
+export interface IkigaiData {
+  passion: string[];
+  mission: string[];
+  vocation: string[];
+  profession: string[];
+  reflection: string;
+}
+
+export interface RoueVieData {
+  axes: { label: string; score: number }[];
+  lowest_area_action: string;
+  reflection: string;
+}
+
+export interface ExerciseDefinition {
+  type: ExerciseType;
+  title: string;
+  description: string;
+  estimatedMinutes: number;
+}
+
+export interface ExerciseReview {
+  observation: string;
+  question: string;
+  piste: string;
+}
+
+export interface ExerciseSuggestion {
+  type: ExerciseType;
+  reason: string;
+}
+
+// --- Profile evolution ---
+
 export interface ProfileEvolution {
   add_croyances?: string[];
   remove_croyances?: string[];

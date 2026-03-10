@@ -206,6 +206,41 @@ export interface Database {
           },
         ];
       };
+      exercise_results: {
+        Row: {
+          id: string;
+          user_id: string;
+          exercise_type: string;
+          data: Json;
+          insights: string[];
+          completed_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          exercise_type: string;
+          data: Json;
+          insights?: string[];
+          completed_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          exercise_type?: string;
+          data?: Json;
+          insights?: string[];
+          completed_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'exercise_results_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       chunks: {
         Row: {
           id: string;
