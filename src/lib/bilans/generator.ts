@@ -94,7 +94,12 @@ ${sessionsSummary || 'Aucune session sur cette période.'}`;
     const textContent = response.content.find((block: { type: string }) => block.type === 'text') as { type: 'text'; text: string } | undefined;
     if (!textContent) return defaultBilanContent(sessions.length, exercisesCount, doneActions, totalActions);
 
-    const parsed = JSON.parse(textContent.text);
+    // Strip markdown code blocks (```json...```) that Claude sometimes adds
+    let rawText = textContent.text.trim();
+    const fenceMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) rawText = fenceMatch[1].trim();
+
+    const parsed = JSON.parse(rawText);
     return {
       summary: parsed.summary || '',
       themes_dominants: Array.isArray(parsed.themes_dominants) ? parsed.themes_dominants : [],

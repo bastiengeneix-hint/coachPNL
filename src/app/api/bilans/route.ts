@@ -22,13 +22,13 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching bilans:', error);
-      return NextResponse.json({ error: 'Failed to fetch bilans' }, { status: 500 });
+      return NextResponse.json({ error: 'Impossible de récupérer les bilans.' }, { status: 500 });
     }
 
     return NextResponse.json(data ?? []);
   } catch (error) {
     console.error('Bilans GET error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Une erreur est survenue. Réessaie.' }, { status: 500 });
   }
 }
 
@@ -143,12 +143,12 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Error saving bilan:', error);
-      return NextResponse.json({ error: 'Failed to save bilan' }, { status: 500 });
+      return NextResponse.json({ error: 'Impossible de sauvegarder le bilan. Réessaie dans quelques instants.' }, { status: 500 });
     }
 
     return NextResponse.json(bilan);
   } catch (error) {
     console.error('Bilans POST error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Une erreur est survenue. Réessaie.' }, { status: 500 });
   }
 }
