@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Error saving bilan:', error);
-      return NextResponse.json({ error: 'Failed to save bilan' }, { status: 500 });
+      return NextResponse.json({ error: 'Impossible de sauvegarder le bilan. Réessaie dans quelques instants.' }, { status: 500 });
     }
 
     return NextResponse.json(bilan);

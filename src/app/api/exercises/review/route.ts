@@ -76,12 +76,21 @@ ${profileBlock}${ragBlock}`,
     }
 
     try {
-      const review = JSON.parse(textContent.text);
-      return NextResponse.json(review);
+      // Strip markdown code blocks (```json...```) that Claude sometimes adds
+      let raw = textContent.text.trim();
+      const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fenceMatch) raw = fenceMatch[1].trim();
+
+      const review = JSON.parse(raw);
+      return NextResponse.json({
+        observation: review.observation || '',
+        question: review.question || '',
+        piste: review.piste || '',
+      });
     } catch {
       // If JSON parsing fails, return a structured fallback
       return NextResponse.json({
-        observation: textContent.text,
+        observation: textContent.text.replace(/```(?:json)?|```/g, '').trim(),
         question: '',
         piste: '',
       });
