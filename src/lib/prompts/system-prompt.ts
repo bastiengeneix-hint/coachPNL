@@ -245,13 +245,22 @@ interface RecentSession {
 }
 
 function buildConversationHistoryBlock(userName: string, recentSessions: RecentSession[]): string {
-  if (!recentSessions || recentSessions.length === 0) return '';
+  // Filter sessions that actually have messages
+  const sessionsWithMessages = (recentSessions || []).filter(
+    (s) => Array.isArray(s.messages) && s.messages.length > 0
+  );
+
+  if (sessionsWithMessages.length === 0) {
+    return `## Historique des conversations
+
+IMPORTANT : Tu n'as PAS accès aux conversations passées de ${userName} dans cette session. Si ${userName} te demande de te souvenir de quelque chose, dis honnêtement que tu n'as pas le détail de vos échanges précédents et demande-lui de te rappeler. N'INVENTE JAMAIS de détails, de noms, de situations ou d'exercices. Les thèmes mentionnés dans le contexte sont des labels généraux — ne les développe pas en inventant des détails.`;
+  }
 
   const parts: string[] = [`## Historique réel des conversations récentes
 
 Ce sont les vrais échanges passés avec ${userName}. Utilise-les pour faire des liens naturels avec ce qu'il t'a déjà dit. Ne cite JAMAIS ces échanges mot pour mot — fais référence naturellement, comme un ami qui se souvient. N'INVENTE JAMAIS de détails, de noms ou de situations qui ne sont pas dans cet historique.`];
 
-  for (const session of recentSessions) {
+  for (const session of sessionsWithMessages) {
     const date = new Date(session.date);
     const daysAgo = Math.round((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
     const timeLabel = daysAgo === 0 ? "aujourd'hui" : daysAgo === 1 ? 'hier' : `il y a ${daysAgo} jours`;
