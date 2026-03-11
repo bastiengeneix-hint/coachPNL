@@ -172,12 +172,31 @@ function SessionContent() {
           themes: analysis.themes,
           exercice_propose: analysis.exercice_propose,
           summary: analysis.summary,
+          coach_summary: analysis.coach_summary || null,
+          actions: analysis.actions || [],
         };
 
         // Evolve profile based on session analysis (non-blocking)
         evolveProfile(analysis.profile_evolution).catch((err) =>
           console.warn('Profile evolution error (non-blocking):', err)
         );
+
+        // Create exercise reminder if the coach proposed one with a schedule
+        if (analysis.exercice_propose && analysis.reminder_config) {
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() + analysis.reminder_config.duration_days);
+          fetch('/api/reminders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: finalSession.id,
+              exercise_description: analysis.exercice_propose,
+              frequency: analysis.reminder_config.frequency,
+              end_date: endDate.toISOString(),
+              message: analysis.reminder_config.message,
+            }),
+          }).catch((err) => console.warn('Reminder creation error (non-blocking):', err));
+        }
       }
     } catch (error) {
       console.warn('Session analysis error (non-blocking):', error);

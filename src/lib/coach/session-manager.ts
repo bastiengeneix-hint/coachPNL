@@ -12,6 +12,8 @@ export function createSession(mode: SessionMode): Session {
     exercice_propose: null,
     exercice_fait: false,
     summary: null,
+    coach_summary: null,
+    actions: [],
   };
 }
 

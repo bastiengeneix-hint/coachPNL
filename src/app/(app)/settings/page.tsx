@@ -5,6 +5,13 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import NavBar from '@/components/NavBar';
 import { getProfile, updateProfile } from '@/lib/memory/store';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  subscribeToPush,
+  unsubscribeFromPush,
+  isPushSubscribed,
+} from '@/lib/notifications/push-manager';
 
 interface Profile {
   projets: string[];
@@ -129,6 +136,8 @@ export default function SettingsPage() {
   const [sources, setSources] = useState<RAGSource[]>([]);
 
   // Upload state
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitre, setUploadTitre] = useState('');
   const [uploadAuteur, setUploadAuteur] = useState('');
@@ -150,6 +159,32 @@ export default function SettingsPage() {
     };
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    const loadNotificationState = async () => {
+      const perm = await getNotificationPermission();
+      setNotificationPermission(perm);
+      if (perm === 'granted') {
+        const subscribed = await isPushSubscribed();
+        setNotificationsEnabled(subscribed);
+      }
+    };
+    loadNotificationState();
+  }, []);
+
+  const handleToggleNotifications = useCallback(async () => {
+    if (notificationsEnabled) {
+      await unsubscribeFromPush();
+      setNotificationsEnabled(false);
+    } else {
+      const granted = await requestNotificationPermission();
+      setNotificationPermission(granted ? 'granted' : 'denied');
+      if (granted) {
+        const subscribed = await subscribeToPush();
+        setNotificationsEnabled(subscribed);
+      }
+    }
+  }, [notificationsEnabled]);
 
   useEffect(() => {
     const loadSources = async () => {
@@ -538,6 +573,41 @@ export default function SettingsPage() {
             </div>
           </section>
         )}
+
+        {/* Notifications section */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">Notifications</h2>
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-800 text-sm font-medium">
+                  Rappels d&apos;exercices
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {notificationPermission === 'denied'
+                    ? 'Notifications bloquées dans le navigateur'
+                    : 'Reçois des rappels pour tes exercices en cours'}
+                </p>
+              </div>
+              <button
+                onClick={handleToggleNotifications}
+                disabled={notificationPermission === 'denied'}
+                className="p-2 rounded-lg transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                <div
+                  className={`w-11 h-6 rounded-full relative transition-colors ${
+                    notificationsEnabled ? 'bg-teal-500' : 'bg-gray-200'
+                  }`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full bg-white absolute top-[4px] transition-all shadow-sm"
+                    style={{ left: notificationsEnabled ? '24px' : '4px' }}
+                  />
+                </div>
+              </button>
+            </div>
+          </div>
+        </section>
 
         {/* Account section */}
         <section className="space-y-4">

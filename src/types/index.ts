@@ -21,6 +21,11 @@ export interface SessionInsight {
   isBreakthrough: boolean;
 }
 
+export interface SessionAction {
+  text: string;
+  done: boolean;
+}
+
 export interface Session {
   id: string;
   date: string;
@@ -31,6 +36,8 @@ export interface Session {
   exercice_propose: string | null;
   exercice_fait: boolean;
   summary: string | null;
+  coach_summary: string | null;
+  actions: SessionAction[];
 }
 
 export interface Profile {
@@ -137,6 +144,52 @@ export interface SessionAnalysis {
   insights: SessionInsight[];
   themes: string[];
   exercice_propose: string | null;
+  reminder_config: ReminderConfig | null;
+  actions: SessionAction[];
+  coach_summary: string;
   summary: string;
   profile_evolution: ProfileEvolution;
+}
+
+// --- Reminder types ---
+
+export interface ReminderConfig {
+  frequency: 'daily' | 'every_2_days' | 'every_3_days' | 'weekly';
+  duration_days: number;
+  message: string;
+}
+
+export interface ExerciseReminder {
+  id: string;
+  exercise_description: string;
+  frequency: string;
+  start_date: string;
+  end_date: string;
+  next_reminder_at: string;
+  completed: boolean;
+}
+
+// --- Bilan types ---
+
+export type BilanType = 'weekly' | 'monthly' | 'yearly';
+
+export interface BilanContent {
+  summary: string;
+  themes_dominants: string[];
+  breakthroughs: string[];
+  actions_completed: number;
+  actions_total: number;
+  sessions_count: number;
+  exercises_done: number;
+  profile_evolution: string;
+  coach_note: string;
+}
+
+export interface Bilan {
+  id: string;
+  type: BilanType;
+  period_start: string;
+  period_end: string;
+  content: BilanContent;
+  generated_at: string;
 }
