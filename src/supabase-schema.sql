@@ -44,7 +44,9 @@ CREATE TABLE sessions (
   themes TEXT[] NOT NULL DEFAULT '{}',
   exercice_propose TEXT,
   exercice_fait BOOLEAN NOT NULL DEFAULT false,
-  summary TEXT
+  summary TEXT,
+  coach_summary TEXT,
+  actions JSONB NOT NULL DEFAULT '[]'
 );
 
 -- Active contexts table (one per user)
@@ -82,6 +84,49 @@ CREATE TABLE chunks (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Exercise results table
+CREATE TABLE exercise_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  exercise_type TEXT NOT NULL,
+  data JSONB NOT NULL DEFAULT '{}',
+  insights TEXT[] NOT NULL DEFAULT '{}',
+  completed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Exercise reminders table
+CREATE TABLE exercise_reminders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+  exercise_description TEXT NOT NULL,
+  frequency TEXT NOT NULL,
+  start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  end_date DATE NOT NULL,
+  next_reminder_at TIMESTAMPTZ NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Push subscriptions table
+CREATE TABLE push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subscription JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Bilans table (weekly/monthly/yearly reviews)
+CREATE TABLE bilans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('weekly', 'monthly', 'yearly')),
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  content JSONB NOT NULL DEFAULT '{}',
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ============================================
 -- INDEXES
 -- ============================================
@@ -99,6 +144,16 @@ CREATE INDEX idx_chunks_embedding ON chunks
 
 -- Users: email lookup
 CREATE INDEX idx_users_email ON users(email);
+
+-- Exercise results: lookup by user
+CREATE INDEX idx_exercise_results_user ON exercise_results(user_id, completed_at DESC);
+
+-- Exercise reminders: lookup for pending reminders
+CREATE INDEX idx_exercise_reminders_next ON exercise_reminders(user_id, next_reminder_at)
+  WHERE completed = false;
+
+-- Bilans: lookup by user and period
+CREATE INDEX idx_bilans_user_period ON bilans(user_id, period_start DESC);
 
 -- ============================================
 -- FUNCTIONS
