@@ -87,14 +87,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(existingBilan);
     }
 
-    // Fetch sessions for the period
-    const { data: sessions } = await supabase
+    // Fetch sessions for the period — use SELECT * to avoid column mismatch issues
+    const { data: sessions, error: sessionsError } = await supabase
       .from('sessions')
-      .select('date, mode, themes, insights, summary, coach_summary, actions, exercice_propose')
+      .select('*')
       .eq('user_id', session.user.id)
       .gte('date', periodStart.toISOString())
       .lte('date', periodEnd.toISOString())
       .order('date', { ascending: true });
+
+    if (sessionsError) {
+      console.error('Bilan sessions query error:', sessionsError, { startStr, endStr, userId: session.user.id });
+      return NextResponse.json({ error: 'Erreur lors de la récupération des sessions' }, { status: 500 });
+    }
 
     // Count exercises
     const { count: exercisesCount } = await supabase
@@ -104,18 +109,19 @@ export async function POST(req: NextRequest) {
       .gte('completed_at', periodStart.toISOString())
       .lte('completed_at', periodEnd.toISOString());
 
-    const sessionData = (sessions ?? []).map((s) => ({
-      date: s.date,
-      mode: s.mode,
-      themes: s.themes || [],
+    const sessionData = (sessions ?? []).map((s: Record<string, unknown>) => ({
+      date: s.date as string,
+      mode: s.mode as string,
+      themes: (s.themes as string[]) || [],
       insights: (Array.isArray(s.insights) ? s.insights : []) as Array<{ text: string; isBreakthrough: boolean }>,
-      summary: s.summary,
-      coach_summary: s.coach_summary,
+      summary: (s.summary as string) || null,
+      coach_summary: (s.coach_summary as string) || null,
       actions: (Array.isArray(s.actions) ? s.actions : []) as Array<{ text: string; done: boolean }>,
-      exercice_propose: s.exercice_propose,
+      exercice_propose: (s.exercice_propose as string) || null,
     }));
 
     if (sessionData.length === 0) {
+      console.warn('Bilan: no sessions found for period', { startStr, endStr, userId: session.user.id, periodStartISO: periodStart.toISOString(), periodEndISO: periodEnd.toISOString() });
       return NextResponse.json({ error: 'Pas de sessions sur cette période' }, { status: 400 });
     }
 

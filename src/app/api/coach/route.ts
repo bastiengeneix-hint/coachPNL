@@ -93,15 +93,20 @@ export async function POST(req: NextRequest) {
         };
 
     // 6b. Fetch recent session messages for real conversation history
+    // Use SELECT * to avoid column mismatch if DB schema differs
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 14);
-    const { data: recentSessions } = await supabase
+    const { data: recentSessions, error: recentSessionsError } = await supabase
       .from('sessions')
-      .select('date, mode, messages, themes, actions, coach_summary')
+      .select('*')
       .eq('user_id', session.user.id)
       .gte('date', cutoffDate.toISOString())
       .order('date', { ascending: false })
       .limit(5);
+
+    if (recentSessionsError) {
+      console.error('Coach: failed to fetch recent sessions for context:', recentSessionsError);
+    }
 
     // 7. Fetch recent exercise results
     const { data: exerciseResults } = await supabase
@@ -132,7 +137,7 @@ export async function POST(req: NextRequest) {
       ragPassages,
       isFirstMessage,
       exerciseResults: (exerciseResults || []) as unknown as ExerciseResult[],
-      recentSessions: (recentSessions || []) as Array<{
+      recentSessions: (recentSessions || []) as unknown as Array<{
         date: string;
         mode: string;
         messages: Array<{ role: string; content: string }>;
@@ -141,6 +146,12 @@ export async function POST(req: NextRequest) {
         coach_summary: string | null;
       }>,
     });
+
+    // Debug: log conversation history status
+    const sessionsWithMessages = (recentSessions || []).filter(
+      (s: Record<string, unknown>) => Array.isArray(s.messages) && (s.messages as unknown[]).length > 0
+    );
+    console.log(`Coach: ${sessionsWithMessages.length} recent sessions with messages found (of ${(recentSessions || []).length} total). System prompt length: ${systemPrompt.length} chars`);
 
     // 10. Call Anthropic
     const apiMessages =
