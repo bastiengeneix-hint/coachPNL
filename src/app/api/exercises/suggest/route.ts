@@ -54,6 +54,7 @@ Les exercices disponibles sont :
 1. "roue_vie" — Roue de la Vie (noter 8 domaines de vie sur 10)
 2. "triangle_equilibre" — Triangle d'Équilibre (équilibrer 3 domaines)
 3. "ikigai" — IKIGAI (trouver son ikigai via 4 cercles)
+4. "systeme12" — Système 1/Système 2 (analyser une question ou décision avec l'instinct vs la réflexion, basé sur Kahneman)
 
 Réponds UNIQUEMENT en JSON : un tableau de 1 à 3 objets [{"type": "...", "reason": "..."}]
 - type : l'identifiant exact de l'exercice

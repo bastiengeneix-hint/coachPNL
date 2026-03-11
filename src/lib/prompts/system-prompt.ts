@@ -248,6 +248,7 @@ function buildExerciseBlock(userName: string, exerciseResults: ExerciseResult[])
     roue_vie: 'Roue de la Vie',
     triangle_equilibre: "Triangle d'Équilibre",
     ikigai: 'IKIGAI',
+    systeme12: 'Système 1 / Système 2',
   };
 
   const lines = exerciseResults.map((r) => {

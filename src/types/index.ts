@@ -83,12 +83,12 @@ export interface RAGSource {
 
 // --- Exercise types ---
 
-export type ExerciseType = 'triangle_equilibre' | 'ikigai' | 'roue_vie';
+export type ExerciseType = 'triangle_equilibre' | 'ikigai' | 'roue_vie' | 'systeme12';
 
 export interface ExerciseResult {
   id: string;
   exercise_type: ExerciseType;
-  data: TriangleEquilibreData | IkigaiData | RoueVieData;
+  data: TriangleEquilibreData | IkigaiData | RoueVieData | Systeme12Data;
   insights: string[];
   completed_at: string;
 }
@@ -110,6 +110,14 @@ export interface RoueVieData {
   axes: { label: string; score: number }[];
   lowest_area_action: string;
   reflection: string;
+}
+
+export interface Systeme12Data {
+  input: string;
+  input_type: 'question' | 'decision' | 'souhait';
+  systeme1: string;
+  systeme2: string;
+  conclusion: string;
 }
 
 export interface ExerciseDefinition {
