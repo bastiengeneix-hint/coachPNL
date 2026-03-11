@@ -95,6 +95,8 @@ export interface Database {
           exercice_propose: string | null;
           exercice_fait: boolean;
           summary: string | null;
+          coach_summary: string | null;
+          actions: Json;
         };
         Insert: {
           id?: string;
@@ -107,6 +109,8 @@ export interface Database {
           exercice_propose?: string | null;
           exercice_fait?: boolean;
           summary?: string | null;
+          coach_summary?: string | null;
+          actions?: Json;
         };
         Update: {
           id?: string;
@@ -119,6 +123,8 @@ export interface Database {
           exercice_propose?: string | null;
           exercice_fait?: boolean;
           summary?: string | null;
+          coach_summary?: string | null;
+          actions?: Json;
         };
         Relationships: [
           {
@@ -234,6 +240,127 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: 'exercise_results_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      exercise_reminders: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_id: string | null;
+          exercise_description: string;
+          frequency: string;
+          start_date: string;
+          end_date: string;
+          next_reminder_at: string;
+          completed: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          session_id?: string | null;
+          exercise_description: string;
+          frequency: string;
+          start_date?: string;
+          end_date: string;
+          next_reminder_at: string;
+          completed?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          session_id?: string | null;
+          exercise_description?: string;
+          frequency?: string;
+          start_date?: string;
+          end_date?: string;
+          next_reminder_at?: string;
+          completed?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'exercise_reminders_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'exercise_reminders_session_id_fkey';
+            columns: ['session_id'];
+            isOneToOne: false;
+            referencedRelation: 'sessions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          subscription: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subscription: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          subscription?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'push_subscriptions_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      bilans: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          period_start: string;
+          period_end: string;
+          content: Json;
+          generated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          period_start: string;
+          period_end: string;
+          content: Json;
+          generated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          period_start?: string;
+          period_end?: string;
+          content?: Json;
+          generated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bilans_user_id_fkey';
             columns: ['user_id'];
             isOneToOne: false;
             referencedRelation: 'users';
