@@ -183,6 +183,8 @@ export interface BilanContent {
   exercises_done: number;
   profile_evolution: string;
   coach_note: string;
+  coach_lesson: string;
+  next_action: string;
 }
 
 export interface Bilan {
