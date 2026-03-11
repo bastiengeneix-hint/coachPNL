@@ -316,9 +316,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen pb-24 bg-stone-50">
+    <div className="min-h-screen pb-28 md:pb-24 bg-stone-50">
       {/* Header */}
-      <div className="pt-20 max-w-3xl mx-auto px-6">
+      <div className="md:pt-20 pt-6 max-w-3xl mx-auto px-6">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">

@@ -22,6 +22,7 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generatingBilan, setGeneratingBilan] = useState(false);
+  const [bilanError, setBilanError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -91,6 +92,7 @@ export default function SessionsPage() {
 
   const handleGenerateWeeklyBilan = useCallback(async () => {
     setGeneratingBilan(true);
+    setBilanError(null);
     try {
       const res = await fetch('/api/bilans', {
         method: 'POST',
@@ -98,14 +100,16 @@ export default function SessionsPage() {
         body: JSON.stringify({ type: 'weekly' }),
       });
 
-      if (res.ok) {
-        const bilan = await res.json();
-        if (bilan.id) {
-          setBilans((prev) => [bilan, ...prev.filter((b) => b.id !== bilan.id)]);
-        }
+      const data = await res.json();
+
+      if (res.ok && data.id) {
+        setBilans((prev) => [data, ...prev.filter((b) => b.id !== data.id)]);
+      } else {
+        setBilanError(data.error || 'Impossible de générer le bilan');
       }
     } catch (err) {
       console.error('Failed to generate bilan:', err);
+      setBilanError('Erreur de connexion. Réessaie.');
     } finally {
       setGeneratingBilan(false);
     }
@@ -114,8 +118,8 @@ export default function SessionsPage() {
   const pendingActions = actions.filter((a) => !a.done);
 
   return (
-    <div className="min-h-screen bg-stone-50 relative z-10 pb-24">
-      <div className="pt-20 max-w-3xl mx-auto px-6">
+    <div className="min-h-screen bg-stone-50 relative z-10 pb-28 md:pb-24">
+      <div className="md:pt-20 pt-6 max-w-3xl mx-auto px-6">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-800">Mon suivi</h1>
           <p className="text-sm text-gray-500 mt-1">Sessions, actions et bilans</p>
@@ -146,6 +150,12 @@ export default function SessionsPage() {
                     {generatingBilan ? 'Génération...' : 'Bilan de la semaine'}
                   </button>
                 </div>
+
+                {bilanError && (
+                  <div className="mb-3 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600 animate-fade-in">
+                    {bilanError}
+                  </div>
+                )}
 
                 {bilans.length > 0 ? (
                   <div className="space-y-3">

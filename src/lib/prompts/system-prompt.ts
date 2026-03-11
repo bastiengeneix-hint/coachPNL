@@ -235,6 +235,57 @@ ${userName} a fait les exercices suivants récemment. Utilise ces résultats pou
 ${lines.join('\n')}`;
 }
 
+interface RecentSession {
+  date: string;
+  mode: string;
+  messages: Array<{ role: string; content: string }>;
+  themes: string[];
+  actions: Array<{ text: string; done: boolean }>;
+  coach_summary: string | null;
+}
+
+function buildConversationHistoryBlock(userName: string, recentSessions: RecentSession[]): string {
+  if (!recentSessions || recentSessions.length === 0) return '';
+
+  const parts: string[] = [`## Historique réel des conversations récentes
+
+Ce sont les vrais échanges passés avec ${userName}. Utilise-les pour faire des liens naturels avec ce qu'il t'a déjà dit. Ne cite JAMAIS ces échanges mot pour mot — fais référence naturellement, comme un ami qui se souvient. N'INVENTE JAMAIS de détails, de noms ou de situations qui ne sont pas dans cet historique.`];
+
+  for (const session of recentSessions) {
+    const date = new Date(session.date);
+    const daysAgo = Math.round((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+    const timeLabel = daysAgo === 0 ? "aujourd'hui" : daysAgo === 1 ? 'hier' : `il y a ${daysAgo} jours`;
+    const modeLabel = session.mode === 'deblocage' ? 'Déblocage' : 'Journal';
+
+    const msgs = Array.isArray(session.messages) ? session.messages : [];
+    if (msgs.length === 0) continue;
+
+    // Last 10 messages per session to keep context manageable
+    const recentMsgs = msgs.slice(-10);
+    const conversationLines = recentMsgs.map((m) => {
+      const speaker = m.role === 'user' ? userName : 'Coach';
+      const content = m.content.length > 500 ? m.content.slice(0, 500) + '...' : m.content;
+      return `${speaker}: ${content}`;
+    }).join('\n');
+
+    let sessionBlock = `### ${modeLabel} — ${timeLabel}`;
+    if (session.themes && session.themes.length > 0) {
+      sessionBlock += ` (${session.themes.join(', ')})`;
+    }
+    sessionBlock += `\n${conversationLines}`;
+
+    const actions = Array.isArray(session.actions) ? session.actions : [];
+    if (actions.length > 0) {
+      const actionLines = actions.map((a) => `- ${a.done ? '[FAIT]' : '[EN COURS]'} ${a.text}`).join('\n');
+      sessionBlock += `\nActions :\n${actionLines}`;
+    }
+
+    parts.push(sessionBlock);
+  }
+
+  return parts.join('\n\n');
+}
+
 export function buildSystemPrompt(params: {
   userName: string;
   profile: Profile;
@@ -243,6 +294,7 @@ export function buildSystemPrompt(params: {
   ragPassages: RAGPassage[];
   isFirstMessage: boolean;
   exerciseResults?: ExerciseResult[];
+  recentSessions?: RecentSession[];
 }): string {
   const ton = params.profile.preferences?.ton || 'mix';
 
@@ -251,6 +303,7 @@ export function buildSystemPrompt(params: {
     buildPostureBlock(params.userName),
     buildProfileBlock(params.userName, params.profile),
     buildContextBlock(params.activeContext),
+    buildConversationHistoryBlock(params.userName, params.recentSessions || []),
     buildExerciseBlock(params.userName, params.exerciseResults || []),
     buildRAGBlock(params.ragPassages, params.userName),
     buildModeBlock(params.mode, params.isFirstMessage),
