@@ -20,7 +20,9 @@ Retourne un JSON avec exactement cette structure :
   "sessions_count": 12,
   "exercises_done": 3,
   "profile_evolution": "Description de comment l'utilisateur a évolué sur la période. Ce qui a bougé dans ses croyances, ses patterns, ses projets.",
-  "coach_note": "Note personnelle du coach — ce qu'il retient de cette période, ce qu'il aimerait dire à l'utilisateur. 2-3 phrases intimes et encourageantes."
+  "coach_note": "Note personnelle du coach — ce qu'il retient de cette période, ce qu'il aimerait dire à l'utilisateur. 2-3 phrases intimes et encourageantes.",
+  "coach_lesson": "LA leçon clé de cette période. Une phrase percutante que le coach formule comme un enseignement. Ex: 'Tu as découvert que derrière ta procrastination se cache une peur de ne pas être à la hauteur.'",
+  "next_action": "L'action concrète et spécifique que le coach recommande pour la prochaine période. Pas vague. Ex: 'Chaque matin cette semaine, prends 2 minutes pour noter une chose que tu fais bien.'"
 }
 
 Règles :
@@ -30,6 +32,8 @@ Règles :
 - actions_completed / actions_total : compte les actions faites vs total
 - profile_evolution : ce qui a changé dans la façon de penser, les croyances, les patterns
 - coach_note : la note la plus personnelle. Ce que le coach dirait en fin de mois. "Si je devais retenir une chose..."
+- coach_lesson : LA grande leçon de la période. Une seule phrase claire et percutante. Pas de blabla. C'est l'insight principal que le coach retient.
+- next_action : UNE action concrète, spécifique, réalisable dans la prochaine semaine. Pas "continue comme ça". Quelque chose de précis et actionnable.
 
 Retourne UNIQUEMENT le JSON, sans commentaire ni markdown.`;
 
@@ -110,6 +114,8 @@ ${sessionsSummary || 'Aucune session sur cette période.'}`;
       exercises_done: exercisesCount,
       profile_evolution: parsed.profile_evolution || '',
       coach_note: parsed.coach_note || '',
+      coach_lesson: parsed.coach_lesson || '',
+      next_action: parsed.next_action || '',
     };
   } catch (error) {
     console.error('Bilan generation error:', error);
@@ -128,5 +134,7 @@ function defaultBilanContent(sessions: number, exercises: number, done: number, 
     exercises_done: exercises,
     profile_evolution: '',
     coach_note: '',
+    coach_lesson: '',
+    next_action: '',
   };
 }

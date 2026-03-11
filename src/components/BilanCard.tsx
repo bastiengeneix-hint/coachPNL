@@ -109,6 +109,22 @@ export default function BilanCard({ type, periodStart, periodEnd, content }: Bil
             </div>
           )}
 
+          {/* Coach lesson */}
+          {content.coach_lesson && (
+            <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+              <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">La leçon de la semaine</p>
+              <p className="text-sm text-amber-900 leading-relaxed font-medium">{content.coach_lesson}</p>
+            </div>
+          )}
+
+          {/* Next action */}
+          {content.next_action && (
+            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-200">
+              <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">Action à faire</p>
+              <p className="text-sm text-indigo-900 leading-relaxed font-medium">{content.next_action}</p>
+            </div>
+          )}
+
           {/* Coach note */}
           {content.coach_note && (
             <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
