@@ -47,7 +47,7 @@ export default function ExercicesPage() {
     <div className="min-h-screen bg-stone-50">
       <NavBar active="exercices" />
 
-      <main className="pt-20 pb-16 px-6 max-w-2xl mx-auto">
+      <main className="md:pt-20 pt-6 pb-24 md:pb-16 px-6 max-w-2xl mx-auto">
         {/* Header */}
         <div className="mt-10 mb-8 animate-fade-in">
           <h1 className="text-2xl font-semibold text-gray-800">Exercices</h1>

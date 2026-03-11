@@ -63,7 +63,7 @@ export default function ExerciseLayout({
       {showNav && <NavBar active="exercices" />}
 
       {/* Progress */}
-      <div className={`${showNav ? 'pt-20' : 'pt-10'} pb-4 px-6`}>
+      <div className={`${showNav ? 'md:pt-20 pt-6' : 'pt-10'} pb-4 px-6`}>
         <ProgressDots current={currentStep} total={totalSteps} />
       </div>
 

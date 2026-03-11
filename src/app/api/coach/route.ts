@@ -92,6 +92,17 @@ export async function POST(req: NextRequest) {
           pending_exercice: null,
         };
 
+    // 6b. Fetch recent session messages for real conversation history
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 14);
+    const { data: recentSessions } = await supabase
+      .from('sessions')
+      .select('date, mode, messages, themes, actions, coach_summary')
+      .eq('user_id', session.user.id)
+      .gte('date', cutoffDate.toISOString())
+      .order('date', { ascending: false })
+      .limit(5);
+
     // 7. Fetch recent exercise results
     const { data: exerciseResults } = await supabase
       .from('exercise_results')
@@ -121,6 +132,14 @@ export async function POST(req: NextRequest) {
       ragPassages,
       isFirstMessage,
       exerciseResults: (exerciseResults || []) as unknown as ExerciseResult[],
+      recentSessions: (recentSessions || []) as Array<{
+        date: string;
+        mode: string;
+        messages: Array<{ role: string; content: string }>;
+        themes: string[];
+        actions: Array<{ text: string; done: boolean }>;
+        coach_summary: string | null;
+      }>,
     });
 
     // 10. Call Anthropic
