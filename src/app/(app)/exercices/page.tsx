@@ -83,9 +83,48 @@ export default function ExercicesPage() {
           </div>
         )}
 
+        {/* Système 1/2 — featured card */}
+        <button
+          onClick={() => router.push('/exercices/systeme12')}
+          className="w-full mb-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl p-6 text-left transition-all duration-200 animate-fade-in hover:shadow-lg hover:from-teal-500 hover:to-teal-600 cursor-pointer group"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                <path d={EXERCISE_ICONS.systeme12} />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-semibold text-lg mb-1">
+                Système 1 / Système 2
+              </p>
+              <p className="text-teal-100 text-sm leading-relaxed">
+                Soumets une question, une décision ou un souhait. Découvre ce que ton instinct et ta raison en disent — et ce que l&apos;écart révèle.
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-xs text-teal-200 bg-white/10 px-2.5 py-1 rounded-full">
+                  ~5 min
+                </span>
+                {getLastDate('systeme12') && (
+                  <span className="text-xs text-teal-200">
+                    Dernier : {getLastDate('systeme12')}
+                  </span>
+                )}
+                <span className="ml-auto text-xs text-teal-200 group-hover:text-white transition-colors flex items-center gap-1">
+                  Lancer
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </button>
+
         {/* Exercise cards */}
+        <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Exercices</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {EXERCISE_DEFINITIONS.map((def, i) => {
+          {EXERCISE_DEFINITIONS.filter((def) => def.type !== 'systeme12').map((def, i) => {
             const lastDate = getLastDate(def.type);
             const isSuggested = suggestedTypes.includes(def.type);
 
