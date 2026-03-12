@@ -7,33 +7,40 @@ function getAnthropic() {
   });
 }
 
-const BILAN_PROMPT = `Tu es le coach personnel de l'utilisateur. On te donne les données de ses sessions sur une période donnée. Génère un bilan chaleureux et personnel.
+const BILAN_PROMPT = `Tu es le coach personnel de l'utilisateur. On te donne les données RÉELLES de ses sessions sur une période donnée. Génère un bilan chaleureux et personnel.
+
+RÈGLE ABSOLUE : Tu ne travailles QU'AVEC les données fournies ci-dessous. Tu n'INVENTES JAMAIS :
+- Pas de thèmes qui ne sont pas explicitement dans les sessions
+- Pas de prises de conscience que l'utilisateur n'a pas eues
+- Pas de sujets (argent, famille, anxiété, etc.) qui n'apparaissent pas dans les résumés ou thèmes fournis
+- Si les données sont pauvres ou vagues, ton bilan est court et honnête : "On a échangé cette semaine, mais les sujets restent à creuser."
+- MIEUX VAUT un bilan court et vrai qu'un bilan riche et inventé
 
 Retourne un JSON avec exactement cette structure :
 
 {
-  "summary": "Résumé chaleureux et personnel de la période, écrit en tutoyant l'utilisateur. 3-5 phrases.",
-  "themes_dominants": ["thème1", "thème2", "thème3"],
-  "breakthroughs": ["prise de conscience majeure 1", "prise de conscience majeure 2"],
+  "summary": "Résumé chaleureux basé UNIQUEMENT sur ce qui est dans les sessions. 2-4 phrases.",
+  "themes_dominants": ["uniquement les thèmes présents dans les données"],
+  "breakthroughs": ["uniquement les prises de conscience explicites dans les sessions"],
   "actions_completed": 5,
   "actions_total": 8,
   "sessions_count": 12,
   "exercises_done": 3,
-  "profile_evolution": "Description de comment l'utilisateur a évolué sur la période. Ce qui a bougé dans ses croyances, ses patterns, ses projets.",
-  "coach_note": "Note personnelle du coach — ce qu'il retient de cette période, ce qu'il aimerait dire à l'utilisateur. 2-3 phrases intimes et encourageantes.",
-  "coach_lesson": "LA leçon clé de cette période. Une phrase percutante que le coach formule comme un enseignement. Ex: 'Tu as découvert que derrière ta procrastination se cache une peur de ne pas être à la hauteur.'",
-  "next_action": "L'action concrète et spécifique que le coach recommande pour la prochaine période. Pas vague. Ex: 'Chaque matin cette semaine, prends 2 minutes pour noter une chose que tu fais bien.'"
+  "profile_evolution": "Ce qui a RÉELLEMENT bougé selon les sessions. Si rien de clair, dis-le : 'Pas d'évolution majeure visible cette semaine.'",
+  "coach_note": "Note personnelle du coach basée sur ce qu'il a VU dans les sessions. 2-3 phrases.",
+  "coach_lesson": "La leçon clé qui ressort des sessions. Si rien de fort, une observation simple sur la régularité ou l'engagement.",
+  "next_action": "Une action concrète EN LIEN avec les vrais sujets abordés. Pas une action générique."
 }
 
 Règles :
-- summary : chaleureux, personnel, en tutoyant. Pas un rapport clinique. "Ce mois a été un tournant pour toi..."
-- themes_dominants : les 3-5 thèmes les plus présents sur la période
-- breakthroughs : seulement les vraies prises de conscience marquantes (pas les petites)
-- actions_completed / actions_total : compte les actions faites vs total
-- profile_evolution : ce qui a changé dans la façon de penser, les croyances, les patterns
-- coach_note : la note la plus personnelle. Ce que le coach dirait en fin de mois. "Si je devais retenir une chose..."
-- coach_lesson : LA grande leçon de la période. Une seule phrase claire et percutante. Pas de blabla. C'est l'insight principal que le coach retient.
-- next_action : UNE action concrète, spécifique, réalisable dans la prochaine semaine. Pas "continue comme ça". Quelque chose de précis et actionnable.
+- summary : chaleureux, en tutoyant. UNIQUEMENT basé sur les résumés et thèmes des sessions fournies.
+- themes_dominants : UNIQUEMENT les thèmes qui apparaissent dans les données. Si aucun thème clair, tableau vide [].
+- breakthroughs : UNIQUEMENT les insights marqués comme breakthroughs dans les données. Si aucun, tableau vide [].
+- actions_completed / actions_total : compte exact des actions faites vs total dans les données.
+- profile_evolution : ce qui a changé SELON LES DONNÉES. Si pas d'évolution visible, dis-le honnêtement.
+- coach_note : personnelle mais ANCRÉE dans les sessions réelles.
+- coach_lesson : tirée des VRAIS échanges. Si les sessions sont légères, la leçon porte sur la présence ou la régularité.
+- next_action : EN LIEN DIRECT avec un sujet réellement abordé. Jamais d'action inventée sur un thème absent.
 
 Retourne UNIQUEMENT le JSON, sans commentaire ni markdown.`;
 
@@ -66,11 +73,17 @@ export async function generateBilan(
     else if (s.summary) parts.push(`Résumé: ${s.summary}`);
     if (s.insights.length > 0) {
       const breakthroughs = s.insights.filter((i) => i.isBreakthrough);
+      const regular = s.insights.filter((i) => !i.isBreakthrough);
       if (breakthroughs.length > 0) parts.push(`Breakthroughs: ${breakthroughs.map((b) => b.text).join('; ')}`);
+      if (regular.length > 0) parts.push(`Insights: ${regular.map((i) => i.text).join('; ')}`);
     }
     if (s.actions.length > 0) {
-      const done = s.actions.filter((a) => a.done).length;
-      parts.push(`Actions: ${done}/${s.actions.length} faites`);
+      parts.push(`Actions: ${s.actions.map((a) => `${a.done ? '[FAIT]' : '[EN COURS]'} ${a.text}`).join('; ')}`);
+    }
+    if (s.exercice_propose) parts.push(`Exercice proposé: ${s.exercice_propose}`);
+    // Flag if session has no real content
+    if (!s.coach_summary && !s.summary && s.themes.length === 0 && s.insights.length === 0) {
+      parts.push('(Session sans contenu analysé)');
     }
     return parts.join(' | ');
   }).join('\n');
