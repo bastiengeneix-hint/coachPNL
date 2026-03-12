@@ -24,6 +24,7 @@ function SessionContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const mode = (searchParams.get('mode') as SessionMode) || 'deblocage';
+  const shouldResume = searchParams.get('resume') === 'true';
 
   const [session, setSession] = useState<Session | null>(null);
   const [input, setInput] = useState('');
@@ -52,8 +53,25 @@ function SessionContent() {
     }
   }, [input]);
 
-  // Initialize session
+  // Initialize or resume session
   const initSession = useCallback(async () => {
+    // Try to resume active session
+    if (shouldResume) {
+      try {
+        const res = await fetch('/api/sessions/active');
+        if (res.ok) {
+          const activeSession = await res.json();
+          if (activeSession && activeSession.messages?.length > 0) {
+            setSession(activeSession);
+            return;
+          }
+        }
+      } catch {
+        // Fall through to create new session
+      }
+    }
+
+    // Create new session
     const newSession = createSession(mode);
     setSession(newSession);
     setIsLoading(true);
@@ -88,7 +106,7 @@ function SessionContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [mode]);
+  }, [mode, shouldResume]);
 
   useEffect(() => {
     initSession();
@@ -154,7 +172,7 @@ function SessionContent() {
     const currentSession = sessionRef.current;
     setIsLoading(true);
 
-    let finalSession: Session = { ...currentSession };
+    let finalSession: Session = { ...currentSession, ended: true };
 
     try {
       // Analyze session via Claude (extracts insights, themes, exercises, profile evolution)

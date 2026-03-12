@@ -38,6 +38,7 @@ export interface Session {
   summary: string | null;
   coach_summary: string | null;
   actions: SessionAction[];
+  ended: boolean;
 }
 
 export interface Profile {

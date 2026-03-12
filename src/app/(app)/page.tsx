@@ -4,12 +4,13 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useEffect, useState } from 'react';
 import NavBar from '@/components/NavBar';
-import type { ExerciseReminder } from '@/types';
+import type { ExerciseReminder, Session } from '@/types';
 
 export default function HomePage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [activeReminders, setActiveReminders] = useState<ExerciseReminder[]>([]);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
 
   const isEvening = useMemo(() => {
     const hour = new Date().getHours();
@@ -20,18 +21,25 @@ export default function HomePage() {
   const greeting = isEvening ? 'Bonsoir' : 'Bonjour';
 
   useEffect(() => {
-    async function loadReminders() {
+    async function loadData() {
       try {
-        const res = await fetch('/api/reminders');
-        if (res.ok) {
-          const data = await res.json();
+        const [remindersRes, activeRes] = await Promise.all([
+          fetch('/api/reminders'),
+          fetch('/api/sessions/active'),
+        ]);
+        if (remindersRes.ok) {
+          const data = await remindersRes.json();
           setActiveReminders(data);
+        }
+        if (activeRes.ok) {
+          const data = await activeRes.json();
+          if (data && data.id) setActiveSession(data);
         }
       } catch {
         // Non-blocking
       }
     }
-    loadReminders();
+    loadData();
   }, []);
 
   const handleCompleteReminder = async (id: string) => {
@@ -85,6 +93,33 @@ export default function HomePage() {
             Qu&apos;est-ce qu&apos;on travaille aujourd&apos;hui&#8239;?
           </p>
         </div>
+
+        {/* Resume active session */}
+        {activeSession && (
+          <button
+            onClick={() => router.push(`/session?mode=${activeSession.mode}&resume=true`)}
+            className="w-full mb-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl p-5 text-left transition-all duration-200 animate-fade-in hover:shadow-lg hover:from-teal-500 hover:to-teal-600 cursor-pointer group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-base">
+                  Reprendre la conversation
+                </p>
+                <p className="text-teal-100 text-sm mt-0.5">
+                  {activeSession.mode === 'deblocage' ? 'Déblocage' : 'Journal'} &middot; {activeSession.messages.length} messages
+                </p>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-teal-200 group-hover:text-white transition-colors shrink-0">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </div>
+          </button>
+        )}
 
         {/* Active exercise reminders */}
         {activeReminders.length > 0 && (
