@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import ExerciseLayout from '@/components/exercises/ExerciseLayout';
 import CoachReview from '@/components/exercises/CoachReview';
 import { saveExerciseResult, getExerciseReview } from '@/lib/exercises/store';
-import { ExerciseReview, Systeme12Data } from '@/types';
+import { evolveProfile } from '@/lib/memory/store';
+import { ExerciseReview, ProfileEvolution, Systeme12Data } from '@/types';
 
 type InputType = 'question' | 'decision' | 'souhait';
 
@@ -28,6 +29,7 @@ interface AnalysisResult {
   systeme1: string;
   systeme2: string;
   conclusion: string;
+  profile_evolution?: ProfileEvolution;
 }
 
 export default function Systeme12Page() {
@@ -79,6 +81,13 @@ export default function Systeme12Page() {
         data,
         insights,
       });
+
+      // Evolve profile with insights from the S1/S2 analysis
+      if (analysis.profile_evolution) {
+        evolveProfile(analysis.profile_evolution).catch((err) =>
+          console.warn('Profile evolution error (non-blocking):', err)
+        );
+      }
 
       const reviewResult = await getExerciseReview({
         exercise_type: 'systeme12',

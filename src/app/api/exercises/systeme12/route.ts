@@ -52,11 +52,17 @@ export async function POST(request: NextRequest) {
       system: `Tu es un coach PNL expert en sciences cognitives. Tu utilises le modèle Système 1 / Système 2 de Daniel Kahneman pour analyser les pensées de ton client. Tu le tutoies.
 
 Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
-{"systeme1": "...", "systeme2": "...", "conclusion": "..."}
+{"systeme1": "...", "systeme2": "...", "conclusion": "...", "profile_evolution": {"add_croyances": [], "remove_croyances": [], "add_patterns": [], "remove_patterns": []}}
 
 - systeme1 : La réponse du Système 1 (pensée rapide, instinctive, émotionnelle). C'est ce que l'utilisateur ressent immédiatement, son réflexe, ses biais. Écris comme si tu donnais voix à son instinct. 2-4 phrases, ton direct.
 - systeme2 : La réponse du Système 2 (pensée lente, analytique, rationnelle). C'est l'analyse posée, les faits, la logique. Ce que dirait la partie rationnelle. 2-4 phrases, ton posé.
 - conclusion : TON avis de coach. Ce que cet écart entre les deux systèmes révèle sur l'utilisateur. Où est le vrai blocage ? Quelle croyance sous-jacente ? Et une piste concrète. 3-5 phrases, incisif et personnel.
+- profile_evolution : Ce que cet exercice révèle sur le profil de l'utilisateur. Compare avec son profil actuel et n'ajoute que ce qui est NOUVEAU :
+  - add_croyances : croyances limitantes qui se révèlent dans l'écart entre S1 et S2 (ex: "Je ne mérite pas le succès")
+  - remove_croyances : croyances du profil actuel que cet exercice semble remettre en question
+  - add_patterns : patterns de sabotage qui émergent (ex: "Rationalise pour éviter d'agir")
+  - remove_patterns : patterns du profil actuel qui semblent dépassés
+  Si rien de nouveau, laisse les tableaux vides.
 
 Utilise le profil de l'utilisateur pour personnaliser l'analyse — fais des liens avec ses patterns et croyances.`,
       messages: [
@@ -84,6 +90,12 @@ ${profileBlock}${ragBlock}`,
       systeme1: parsed.systeme1 || '',
       systeme2: parsed.systeme2 || '',
       conclusion: parsed.conclusion || '',
+      profile_evolution: {
+        add_croyances: parsed.profile_evolution?.add_croyances || [],
+        remove_croyances: parsed.profile_evolution?.remove_croyances || [],
+        add_patterns: parsed.profile_evolution?.add_patterns || [],
+        remove_patterns: parsed.profile_evolution?.remove_patterns || [],
+      },
     });
   } catch (error) {
     console.error('Systeme12 exercise error:', error);
