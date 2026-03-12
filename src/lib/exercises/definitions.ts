@@ -19,6 +19,12 @@ export const EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
     description: 'Explore tes passions, ta mission, ta vocation et ta profession pour trouver ton IKIGAI.',
     estimatedMinutes: 15,
   },
+  {
+    type: 'systeme12',
+    title: 'Système 1 / Système 2',
+    description: 'Analyse une question ou décision avec tes deux modes de pensée : l\'instinct et la réflexion.',
+    estimatedMinutes: 5,
+  },
 ];
 
 export const ROUE_VIE_AXES = [

@@ -11,12 +11,14 @@ const EXERCISE_ICONS: Record<ExerciseType, string> = {
   roue_vie: 'M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm0-14v6l4 4',
   triangle_equilibre: 'M12 2L2 20h20L12 2zm0 4l7 12H5l7-12z',
   ikigai: 'M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 14a4 4 0 100-8 4 4 0 000 8zm4-4a4 4 0 100-8 4 4 0 000 8z',
+  systeme12: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
 };
 
 const EXERCISE_ROUTES: Record<ExerciseType, string> = {
   roue_vie: '/exercices/roue',
   triangle_equilibre: '/exercices/triangle',
   ikigai: '/exercices/ikigai',
+  systeme12: '/exercices/systeme12',
 };
 
 export default function ExercicesPage() {

@@ -248,6 +248,7 @@ function buildExerciseBlock(userName: string, exerciseResults: ExerciseResult[])
     roue_vie: 'Roue de la Vie',
     triangle_equilibre: "Triangle d'Équilibre",
     ikigai: 'IKIGAI',
+    systeme12: 'Système 1 / Système 2',
   };
 
   const lines = exerciseResults.map((r) => {
@@ -267,6 +268,10 @@ function buildExerciseBlock(userName: string, exerciseResults: ExerciseResult[])
       line += ` : ${areas.map((a) => `${a.label} (${a.score}/10)`).join(', ')}`;
     } else if (r.exercise_type === 'ikigai' && r.data) {
       // Just mention the convergences from insights
+    } else if (r.exercise_type === 'systeme12' && r.data && 'input' in r.data) {
+      const s12 = r.data as { input: string; input_type: string; systeme1: string; systeme2: string; conclusion: string };
+      const typeLabel = s12.input_type === 'question' ? 'Question' : s12.input_type === 'decision' ? 'Décision' : 'Souhait';
+      line += ` : ${typeLabel} — "${s12.input.slice(0, 100)}". S1: ${s12.systeme1.slice(0, 120)}... S2: ${s12.systeme2.slice(0, 120)}... Conclusion coach: ${s12.conclusion.slice(0, 150)}`;
     }
 
     if (r.insights.length > 0) {
