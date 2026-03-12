@@ -14,6 +14,7 @@ export function createSession(mode: SessionMode): Session {
     summary: null,
     coach_summary: null,
     actions: [],
+    ended: false,
   };
 }
 
