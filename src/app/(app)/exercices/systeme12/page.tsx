@@ -41,9 +41,11 @@ export default function Systeme12Page() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [review, setReview] = useState<ExerciseReview | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/exercises/systeme12', {
         method: 'POST',
@@ -54,8 +56,9 @@ export default function Systeme12Page() {
       const result = await res.json();
       setAnalysis(result);
       setStep(2);
-    } catch (error) {
-      console.error('Systeme12 analysis error:', error);
+    } catch (err) {
+      console.error('Systeme12 analysis error:', err);
+      setError('Erreur lors de l\'analyse. Réessaie.');
     } finally {
       setLoading(false);
     }
@@ -64,6 +67,7 @@ export default function Systeme12Page() {
   const handleSave = async () => {
     if (!analysis) return;
     setSaving(true);
+    setError(null);
     try {
       const data: Systeme12Data = {
         input,
@@ -89,14 +93,21 @@ export default function Systeme12Page() {
         );
       }
 
-      const reviewResult = await getExerciseReview({
-        exercise_type: 'systeme12',
-        data,
-        insights,
-      });
-      setReview(reviewResult);
-    } catch (error) {
-      console.error('Error saving exercise:', error);
+      try {
+        const reviewResult = await getExerciseReview({
+          exercise_type: 'systeme12',
+          data,
+          insights,
+        });
+        setReview(reviewResult);
+      } catch (reviewErr) {
+        console.warn('Review error (non-blocking):', reviewErr);
+        // Save succeeded but review failed — still redirect
+        router.push('/exercices');
+      }
+    } catch (err) {
+      console.error('Error saving exercise:', err);
+      setError('Erreur lors de l\'enregistrement. Réessaie.');
     } finally {
       setSaving(false);
     }
@@ -231,6 +242,12 @@ export default function Systeme12Page() {
               </div>
               <p className="text-sm text-teal-900 leading-relaxed">{analysis.conclusion}</p>
             </div>
+          </div>
+        )}
+        {/* Error message */}
+        {error && (
+          <div className="mt-4 bg-red-50 rounded-xl border border-red-200 p-4 text-sm text-red-700 text-center">
+            {error}
           </div>
         )}
       </ExerciseLayout>

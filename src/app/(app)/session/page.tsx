@@ -13,6 +13,7 @@ import {
   updateActiveContext,
   getRecentSessions,
   evolveProfile,
+  getProfile,
 } from '@/lib/memory/store';
 import type { SessionAnalysis } from '@/types';
 import { buildActiveContext } from '@/lib/memory/context-builder';
@@ -30,10 +31,13 @@ function SessionContent() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEnded, setIsEnded] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionRef = useRef<Session | null>(null);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsObjectUrlRef = useRef<string | null>(null);
 
   // Keep sessionRef in sync
   useEffect(() => {
@@ -44,6 +48,69 @@ function SessionContent() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [session?.messages]);
+
+  // Load TTS preference
+  useEffect(() => {
+    getProfile()
+      .then((p) => {
+        if (p?.preferences && 'tts_enabled' in p.preferences) {
+          setTtsEnabled(Boolean(p.preferences.tts_enabled));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Autoplay TTS on new coach message
+  const prevMessageCountRef = useRef(0);
+  useEffect(() => {
+    if (!ttsEnabled || !session?.messages.length) return;
+    const count = session.messages.length;
+    if (count <= prevMessageCountRef.current) {
+      prevMessageCountRef.current = count;
+      return;
+    }
+    prevMessageCountRef.current = count;
+
+    const lastMessage = session.messages[count - 1];
+    if (lastMessage.role !== 'coach') return;
+
+    // Autoplay TTS for the new coach message
+    const playTts = async () => {
+      try {
+        // Stop any currently playing audio
+        if (ttsAudioRef.current) {
+          ttsAudioRef.current.pause();
+          ttsAudioRef.current = null;
+        }
+        if (ttsObjectUrlRef.current) {
+          URL.revokeObjectURL(ttsObjectUrlRef.current);
+          ttsObjectUrlRef.current = null;
+        }
+
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: lastMessage.content }),
+        });
+        if (!res.ok) return;
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        ttsObjectUrlRef.current = url;
+        const audio = new Audio(url);
+        ttsAudioRef.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          ttsAudioRef.current = null;
+          ttsObjectUrlRef.current = null;
+        };
+        await audio.play();
+      } catch {
+        // Non-blocking
+      }
+    };
+    playTts();
+  }, [session?.messages.length, ttsEnabled]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -281,12 +348,37 @@ function SessionContent() {
             <p className="text-xs text-gray-400 capitalize mt-0.5">{today}</p>
           </div>
 
-          <button
-            onClick={handleEndSession}
-            className="text-sm text-teal-600 hover:text-teal-700 font-medium transition-colors px-3 py-2 rounded-xl hover:bg-teal-50"
-          >
-            Terminer
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setTtsEnabled((v) => !v)}
+              className={`p-2 rounded-xl transition-colors ${
+                ttsEnabled
+                  ? 'text-teal-600 bg-teal-50'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+              }`}
+              aria-label={ttsEnabled ? 'Désactiver audio' : 'Activer audio'}
+            >
+              {ttsEnabled ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              )}
+            </button>
+            <button
+              onClick={handleEndSession}
+              className="text-sm text-teal-600 hover:text-teal-700 font-medium transition-colors px-3 py-2 rounded-xl hover:bg-teal-50"
+            >
+              Terminer
+            </button>
+          </div>
         </div>
       </header>
 
@@ -299,7 +391,7 @@ function SessionContent() {
               className="animate-fade-in"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <CoachMessage message={message} />
+              <CoachMessage message={message} ttsEnabled={ttsEnabled} />
             </div>
           ))}
 
