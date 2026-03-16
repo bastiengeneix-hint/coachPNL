@@ -5,6 +5,14 @@ import OpenAI from 'openai';
 
 const MAX_TEXT_LENGTH = 4096;
 
+export async function GET() {
+  // Health check: is TTS configured?
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ available: false });
+  }
+  return NextResponse.json({ available: true });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -13,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: 'TTS not configured' }, { status: 503 });
+      return NextResponse.json({ error: 'TTS not configured — add OPENAI_API_KEY to your environment' }, { status: 503 });
     }
 
     const { text } = await request.json();
@@ -42,6 +50,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('TTS error:', error);
-    return NextResponse.json({ error: 'TTS generation failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `TTS generation failed: ${message}` }, { status: 500 });
   }
 }
