@@ -1,20 +1,22 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Message } from '@/types';
 
 interface CoachMessageProps {
   message: Message;
   ttsEnabled?: boolean;
+  autoPlay?: boolean;
 }
 
-type TtsState = 'idle' | 'loading' | 'playing';
+type TtsState = 'idle' | 'loading' | 'playing' | 'error';
 
-export default function CoachMessage({ message, ttsEnabled }: CoachMessageProps) {
+export default function CoachMessage({ message, ttsEnabled, autoPlay }: CoachMessageProps) {
   const isCoach = message.role === 'coach';
   const [ttsState, setTtsState] = useState<TtsState>('idle');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const hasAutoPlayed = useRef(false);
 
   const cleanup = useCallback(() => {
     if (audioRef.current) {
@@ -27,7 +29,7 @@ export default function CoachMessage({ message, ttsEnabled }: CoachMessageProps)
     }
   }, []);
 
-  const handleTts = useCallback(async () => {
+  const playTts = useCallback(async () => {
     if (ttsState === 'playing') {
       cleanup();
       setTtsState('idle');
@@ -45,11 +47,28 @@ export default function CoachMessage({ message, ttsEnabled }: CoachMessageProps)
       });
 
       if (!res.ok) {
-        setTtsState('idle');
+        console.warn('TTS API error:', res.status);
+        setTtsState('error');
+        setTimeout(() => setTtsState('idle'), 2000);
+        return;
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('audio')) {
+        console.warn('TTS returned non-audio:', contentType);
+        setTtsState('error');
+        setTimeout(() => setTtsState('idle'), 2000);
         return;
       }
 
       const blob = await res.blob();
+      if (blob.size === 0) {
+        console.warn('TTS returned empty audio');
+        setTtsState('error');
+        setTimeout(() => setTtsState('idle'), 2000);
+        return;
+      }
+
       const url = URL.createObjectURL(blob);
       objectUrlRef.current = url;
 
@@ -62,17 +81,31 @@ export default function CoachMessage({ message, ttsEnabled }: CoachMessageProps)
       };
 
       audio.onerror = () => {
+        console.warn('Audio playback error');
         cleanup();
-        setTtsState('idle');
+        setTtsState('error');
+        setTimeout(() => setTtsState('idle'), 2000);
       };
 
       await audio.play();
       setTtsState('playing');
-    } catch {
+    } catch (err) {
+      console.warn('TTS error:', err);
       cleanup();
-      setTtsState('idle');
+      setTtsState('error');
+      setTimeout(() => setTtsState('idle'), 2000);
     }
   }, [ttsState, message.content, cleanup]);
+
+  // Auto-play on mount if requested (only once)
+  useEffect(() => {
+    if (autoPlay && ttsEnabled && isCoach && !hasAutoPlayed.current) {
+      hasAutoPlayed.current = true;
+      // Small delay to let the UI render first
+      const timer = setTimeout(() => playTts(), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPlay, ttsEnabled, isCoach]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -97,7 +130,7 @@ export default function CoachMessage({ message, ttsEnabled }: CoachMessageProps)
         <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
           {message.content}
         </p>
-        <div className={`flex items-center gap-2 mt-1.5`}>
+        <div className="flex items-center gap-2 mt-1.5">
           <span
             className={`text-[11px] ${
               isCoach ? 'text-gray-400' : 'text-white/60'
@@ -111,8 +144,14 @@ export default function CoachMessage({ message, ttsEnabled }: CoachMessageProps)
 
           {isCoach && ttsEnabled && (
             <button
-              onClick={handleTts}
-              className="p-0.5 rounded-md text-gray-400 hover:text-teal-600 transition-colors"
+              onClick={playTts}
+              className={`p-0.5 rounded-md transition-colors ${
+                ttsState === 'error'
+                  ? 'text-red-400'
+                  : ttsState === 'playing'
+                    ? 'text-teal-600'
+                    : 'text-gray-400 hover:text-teal-600'
+              }`}
               aria-label={ttsState === 'playing' ? 'Arrêter' : 'Écouter'}
             >
               {ttsState === 'loading' ? (
@@ -120,9 +159,15 @@ export default function CoachMessage({ message, ttsEnabled }: CoachMessageProps)
                   <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                 </svg>
               ) : ttsState === 'playing' ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-teal-600">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="5" width="4" height="14" rx="1" />
                   <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+              ) : ttsState === 'error' ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
                 </svg>
               ) : (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

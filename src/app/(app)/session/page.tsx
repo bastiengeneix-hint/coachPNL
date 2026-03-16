@@ -32,12 +32,11 @@ function SessionContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isEnded, setIsEnded] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsAvailable, setTtsAvailable] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionRef = useRef<Session | null>(null);
-  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
-  const ttsObjectUrlRef = useRef<string | null>(null);
 
   // Keep sessionRef in sync
   useEffect(() => {
@@ -49,68 +48,40 @@ function SessionContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [session?.messages]);
 
-  // Load TTS preference
+  // Check TTS availability and load preference
   useEffect(() => {
-    getProfile()
-      .then((p) => {
-        if (p?.preferences && 'tts_enabled' in p.preferences) {
-          setTtsEnabled(Boolean(p.preferences.tts_enabled));
+    async function initTts() {
+      try {
+        const [ttsRes, profile] = await Promise.all([
+          fetch('/api/tts'),
+          getProfile(),
+        ]);
+        if (ttsRes.ok) {
+          const { available } = await ttsRes.json();
+          setTtsAvailable(available);
+          if (available && profile?.preferences?.tts_enabled) {
+            setTtsEnabled(true);
+          }
         }
-      })
-      .catch(() => {});
+      } catch {
+        // TTS not available
+      }
+    }
+    initTts();
   }, []);
 
-  // Autoplay TTS on new coach message
-  const prevMessageCountRef = useRef(0);
+  // Track which message is the latest coach message (for autoplay)
+  const lastCoachMsgIdRef = useRef<string | null>(null);
+  const [autoPlayMsgId, setAutoPlayMsgId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!ttsEnabled || !session?.messages.length) return;
-    const count = session.messages.length;
-    if (count <= prevMessageCountRef.current) {
-      prevMessageCountRef.current = count;
-      return;
+    const lastMsg = session.messages[session.messages.length - 1];
+    if (lastMsg.role === 'coach' && lastMsg.id !== lastCoachMsgIdRef.current) {
+      lastCoachMsgIdRef.current = lastMsg.id;
+      setAutoPlayMsgId(lastMsg.id);
     }
-    prevMessageCountRef.current = count;
-
-    const lastMessage = session.messages[count - 1];
-    if (lastMessage.role !== 'coach') return;
-
-    // Autoplay TTS for the new coach message
-    const playTts = async () => {
-      try {
-        // Stop any currently playing audio
-        if (ttsAudioRef.current) {
-          ttsAudioRef.current.pause();
-          ttsAudioRef.current = null;
-        }
-        if (ttsObjectUrlRef.current) {
-          URL.revokeObjectURL(ttsObjectUrlRef.current);
-          ttsObjectUrlRef.current = null;
-        }
-
-        const res = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: lastMessage.content }),
-        });
-        if (!res.ok) return;
-
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        ttsObjectUrlRef.current = url;
-        const audio = new Audio(url);
-        ttsAudioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          ttsAudioRef.current = null;
-          ttsObjectUrlRef.current = null;
-        };
-        await audio.play();
-      } catch {
-        // Non-blocking
-      }
-    };
-    playTts();
-  }, [session?.messages.length, ttsEnabled]);
+  }, [session?.messages, ttsEnabled]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -349,6 +320,7 @@ function SessionContent() {
           </div>
 
           <div className="flex items-center gap-1">
+            {ttsAvailable && (
             <button
               onClick={() => setTtsEnabled((v) => !v)}
               className={`p-2 rounded-xl transition-colors ${
@@ -372,6 +344,7 @@ function SessionContent() {
                 </svg>
               )}
             </button>
+            )}
             <button
               onClick={handleEndSession}
               className="text-sm text-teal-600 hover:text-teal-700 font-medium transition-colors px-3 py-2 rounded-xl hover:bg-teal-50"
@@ -391,7 +364,11 @@ function SessionContent() {
               className="animate-fade-in"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <CoachMessage message={message} ttsEnabled={ttsEnabled} />
+              <CoachMessage
+                message={message}
+                ttsEnabled={ttsEnabled}
+                autoPlay={message.id === autoPlayMsgId}
+              />
             </div>
           ))}
 
