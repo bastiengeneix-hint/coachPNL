@@ -22,6 +22,7 @@ interface Profile {
     ce_qui_aide: string[];
     ce_qui_bloque: string[];
     ton: 'direct' | 'doux' | 'mix';
+    tts_enabled?: boolean;
   };
 }
 
@@ -386,6 +387,47 @@ export default function SettingsPage() {
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        {/* Audio section */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">Audio</h2>
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-800 text-sm font-medium">
+                  Réponses audio
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Le coach lit ses réponses à voix haute
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const newValue = !profile.preferences.tts_enabled;
+                  const updated: Profile = {
+                    ...profile,
+                    preferences: { ...profile.preferences, tts_enabled: newValue },
+                  };
+                  setProfile(updated);
+                  await updateProfile({ preferences: { ...profile.preferences, tts_enabled: newValue } });
+                  showSavedIndicator();
+                }}
+                className="p-2 rounded-lg transition-colors hover:bg-gray-50"
+              >
+                <div
+                  className={`w-11 h-6 rounded-full relative transition-colors ${
+                    profile.preferences.tts_enabled ? 'bg-teal-500' : 'bg-gray-200'
+                  }`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full bg-white absolute top-[4px] transition-all shadow-sm"
+                    style={{ left: profile.preferences.tts_enabled ? '24px' : '4px' }}
+                  />
+                </div>
+              </button>
+            </div>
           </div>
         </section>
 

@@ -50,6 +50,7 @@ export interface Profile {
     ce_qui_aide: string[];
     ce_qui_bloque: string[];
     ton: 'direct' | 'doux' | 'mix';
+    tts_enabled?: boolean;
   };
 }
 
