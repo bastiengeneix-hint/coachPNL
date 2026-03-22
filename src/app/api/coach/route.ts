@@ -3,12 +3,12 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildSystemPrompt } from '@/lib/prompts/system-prompt';
+import { getCoachingStrategy } from '@/lib/prompts/strategy-agent';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { SessionMode, Profile, ActiveContext, ExerciseResult } from '@/types';
 
 function getAnthropicKey(): string {
-  // Use INNER_COACH_ prefixed key first (avoids system env overrides like Claude Code)
   const key = process.env.INNER_COACH_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
   if (!key) {
     throw new Error('ANTHROPIC_API_KEY is not set. Add INNER_COACH_ANTHROPIC_KEY to your .env file.');
@@ -92,8 +92,7 @@ export async function POST(req: NextRequest) {
           pending_exercice: null,
         };
 
-    // 6b. Fetch recent session messages for real conversation history
-    // Use SELECT * to avoid column mismatch if DB schema differs
+    // 6b. Fetch recent session messages
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 14);
     const { data: recentSessions, error: recentSessionsError } = await supabase
@@ -105,7 +104,7 @@ export async function POST(req: NextRequest) {
       .limit(5);
 
     if (recentSessionsError) {
-      console.error('Coach: failed to fetch recent sessions for context:', recentSessionsError);
+      console.error('Coach: failed to fetch recent sessions:', recentSessionsError);
     }
 
     // 7. Fetch recent exercise results
@@ -128,7 +127,33 @@ export async function POST(req: NextRequest) {
       ragPassages = await retrievePassages(lastUserMessage.content, recentUserMessages);
     }
 
-    // 9. Build system prompt
+    // ─── 9. AGENT STRATÉGISTE (Haiku — rapide) ─────────────────────────────
+    // Analyse la conversation et décide la stratégie AVANT que le coach parle
+
+    const recentCoachMessages = messages
+      .filter((m: { role: string }) => m.role === 'assistant')
+      .slice(-4)
+      .map((m: { content: string }) => m.content);
+
+    const strategy = await getCoachingStrategy({
+      apiKey: getAnthropicKey(),
+      userName,
+      userMessage: lastUserMessage?.content || '',
+      recentCoachMessages,
+      recentUserMessages,
+      ragPassages: ragPassages.map((p) => ({ livre: p.livre, content: p.content })),
+      profile: {
+        projets: profileData.projets,
+        patterns_sabotage: profileData.patterns_sabotage,
+        croyances_limitantes: profileData.croyances_limitantes,
+      },
+      sessionMessageCount: messages.length,
+    });
+
+    console.log(`Coach strategy: move=${strategy.move}, length=${strategy.length}, tone=${strategy.tone}, question=${strategy.should_ask_question}, book=${strategy.book_concept ? 'yes' : 'no'}, avoid=${strategy.avoid.length} patterns`);
+
+    // ─── 10. BUILD DYNAMIC SYSTEM PROMPT ────────────────────────────────────
+
     const systemPrompt = buildSystemPrompt({
       userName,
       profile: profileData,
@@ -145,15 +170,16 @@ export async function POST(req: NextRequest) {
         actions: Array<{ text: string; done: boolean }>;
         coach_summary: string | null;
       }>,
+      strategy,
     });
 
-    // Debug: log conversation history status
     const sessionsWithMessages = (recentSessions || []).filter(
       (s: Record<string, unknown>) => Array.isArray(s.messages) && (s.messages as unknown[]).length > 0
     );
-    console.log(`Coach: ${sessionsWithMessages.length} recent sessions with messages found (of ${(recentSessions || []).length} total). System prompt length: ${systemPrompt.length} chars`);
+    console.log(`Coach: ${sessionsWithMessages.length} sessions with history. System prompt: ${systemPrompt.length} chars`);
 
-    // 10. Call Anthropic
+    // ─── 11. CALL COACH (Sonnet — with focused strategy) ───────────────────
+
     const apiMessages =
       messages.length === 0
         ? [{ role: 'user' as const, content: 'Bonjour, je suis prêt pour cette session.' }]
@@ -164,12 +190,12 @@ export async function POST(req: NextRequest) {
 
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 400,
+      max_tokens: 1024,
       system: systemPrompt,
       messages: apiMessages,
     });
 
-    // 11. Extract text response
+    // 12. Extract text response
     const textContent = response.content.find((block) => block.type === 'text');
     const messageText = textContent ? textContent.text : '';
 
