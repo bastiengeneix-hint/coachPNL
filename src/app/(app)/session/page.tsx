@@ -33,6 +33,8 @@ function SessionContent() {
   const [isEnded, setIsEnded] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [ttsAvailable, setTtsAvailable] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState<string>('ash');
+  const [ttsModel, setTtsModel] = useState<string>('gpt-4o-mini-tts');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -63,6 +65,12 @@ function SessionContent() {
           setTtsAvailable(available);
           if (available && profile?.preferences?.tts_enabled) {
             setTtsEnabled(true);
+          }
+          if (profile?.preferences?.tts_voice) {
+            setTtsVoice(profile.preferences.tts_voice);
+          }
+          if (profile?.preferences?.tts_model) {
+            setTtsModel(profile.preferences.tts_model);
           }
         }
       } catch {
@@ -388,6 +396,8 @@ function SessionContent() {
                 ttsEnabled={ttsEnabled}
                 autoPlay={message.id === autoPlayMsgId}
                 onTtsEnd={handleTtsEnd}
+                ttsVoice={ttsVoice}
+                ttsModel={ttsModel}
               />
             </div>
           ))}
