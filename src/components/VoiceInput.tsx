@@ -14,7 +14,6 @@ interface VoiceInputProps {
   disabled?: boolean;
 }
 
-// Extend Window for webkitSpeechRecognition
 interface SpeechRecognitionEvent {
   resultIndex: number;
   results: SpeechRecognitionResultList;
@@ -26,22 +25,27 @@ const VoiceInput = forwardRef<VoiceInputHandle, VoiceInputProps>(
     const [isSupported, setIsSupported] = useState(true);
     const recognitionRef = useRef<ReturnType<typeof createRecognition> | null>(null);
     const finalTranscriptRef = useRef('');
+    // Track whether the user explicitly pressed stop vs recognition dying on its own
+    const userStoppedRef = useRef(false);
+    // Store latest callbacks to avoid stale closures in recognition handlers
+    const onTranscriptRef = useRef(onTranscript);
+    const onInterimRef = useRef(onInterimTranscript);
+
+    useEffect(() => { onTranscriptRef.current = onTranscript; }, [onTranscript]);
+    useEffect(() => { onInterimRef.current = onInterimTranscript; }, [onInterimTranscript]);
 
     useEffect(() => {
       if (typeof window !== 'undefined') {
-        const SpeechRecognition =
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-          setIsSupported(false);
-        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SR) setIsSupported(false);
       }
     }, []);
 
     function createRecognition() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+      const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SR();
       recognition.lang = 'fr-FR';
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -51,9 +55,16 @@ const VoiceInput = forwardRef<VoiceInputHandle, VoiceInputProps>(
     const startRecording = useCallback(() => {
       if (!isSupported || disabled) return;
 
+      // Clean up any existing recognition
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch { /* ignore */ }
+        recognitionRef.current = null;
+      }
+
       const recognition = createRecognition();
       recognitionRef.current = recognition;
       finalTranscriptRef.current = '';
+      userStoppedRef.current = false;
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         let interim = '';
@@ -65,29 +76,61 @@ const VoiceInput = forwardRef<VoiceInputHandle, VoiceInputProps>(
             interim += result[0].transcript;
           }
         }
-        // Send progressive transcription to parent — fills textarea in real-time
         const fullText = finalTranscriptRef.current + interim;
-        onInterimTranscript?.(fullText);
+        onInterimRef.current?.(fullText);
       };
 
-      recognition.onerror = () => {
-        setIsRecording(false);
+      recognition.onerror = (event: { error: string }) => {
+        // 'aborted' is expected when we call .abort(), 'no-speech' is a timeout
+        if (event.error === 'aborted') return;
+        if (event.error === 'no-speech') {
+          // On mobile, no-speech fires after silence — auto-restart
+          return;
+        }
+        console.warn('Speech recognition error:', event.error);
       };
 
       recognition.onend = () => {
-        // Deliver final transcript
-        const final = finalTranscriptRef.current.trim();
-        if (final) {
-          onTranscript(final);
+        if (userStoppedRef.current) {
+          // User explicitly stopped — deliver final transcript
+          const final = finalTranscriptRef.current.trim();
+          if (final) {
+            onTranscriptRef.current(final);
+          }
+          setIsRecording(false);
+        } else {
+          // Recognition died on its own (mobile timeout, TTS audio, etc.)
+          // Auto-restart to keep recording
+          try {
+            const newRecognition = createRecognition();
+            recognitionRef.current = newRecognition;
+
+            newRecognition.onresult = recognition.onresult;
+            newRecognition.onerror = recognition.onerror;
+            newRecognition.onend = recognition.onend;
+
+            newRecognition.start();
+          } catch {
+            // If restart fails, stop cleanly
+            const final = finalTranscriptRef.current.trim();
+            if (final) {
+              onTranscriptRef.current(final);
+            }
+            setIsRecording(false);
+          }
         }
-        setIsRecording(false);
       };
 
-      recognition.start();
-      setIsRecording(true);
-    }, [isSupported, disabled, onTranscript, onInterimTranscript]);
+      try {
+        recognition.start();
+        setIsRecording(true);
+      } catch {
+        setIsRecording(false);
+      }
+    }, [isSupported, disabled]);
 
     const stopRecording = useCallback(() => {
+      userStoppedRef.current = true;
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         recognitionRef.current = null;
@@ -102,7 +145,6 @@ const VoiceInput = forwardRef<VoiceInputHandle, VoiceInputProps>(
       }
     }, [isRecording, startRecording, stopRecording]);
 
-    // Expose methods to parent for auto-start
     useImperativeHandle(ref, () => ({
       startRecording,
       stopRecording,
@@ -112,47 +154,38 @@ const VoiceInput = forwardRef<VoiceInputHandle, VoiceInputProps>(
     if (!isSupported) return null;
 
     return (
-      <div className="flex flex-col items-center">
-        {/* Bouton micro */}
-        <button
-          onClick={toggleRecording}
-          disabled={disabled}
-          className={`w-11 h-11 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-            isRecording
-              ? 'bg-red-500 mic-recording'
-              : 'bg-teal-600 hover:bg-teal-700'
-          } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
-          aria-label={isRecording ? 'Arrêter' : 'Parler'}
-        >
-          {isRecording ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          ) : (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          )}
-        </button>
-
-        {isRecording && (
-          <span className="mt-2 text-xs text-red-500 animate-pulse font-medium">
-            Enregistrement...
-          </span>
+      <button
+        onClick={toggleRecording}
+        disabled={disabled}
+        className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+          isRecording
+            ? 'bg-red-500 mic-recording'
+            : 'bg-teal-600 hover:bg-teal-700'
+        } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+        aria-label={isRecording ? 'Arrêter' : 'Parler'}
+      >
+        {isRecording ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+        ) : (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
         )}
-      </div>
+      </button>
     );
   }
 );
