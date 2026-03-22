@@ -18,7 +18,7 @@ import {
 import type { SessionAnalysis } from '@/types';
 import { buildActiveContext } from '@/lib/memory/context-builder';
 import CoachMessage from '@/components/CoachMessage';
-import VoiceInput from '@/components/VoiceInput';
+import VoiceInput, { VoiceInputHandle } from '@/components/VoiceInput';
 import SessionEnd from '@/components/SessionEnd';
 
 function SessionContent() {
@@ -37,6 +37,8 @@ function SessionContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionRef = useRef<Session | null>(null);
+  const voiceInputRef = useRef<VoiceInputHandle>(null);
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
 
   // Keep sessionRef in sync
   useEffect(() => {
@@ -281,11 +283,28 @@ function SessionContent() {
     }
   };
 
-  // Handle voice input
+  // Handle voice input — final transcript
   const handleVoiceInput = (transcript: string) => {
-    setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    setInput(transcript);
+    setIsVoiceActive(false);
     textareaRef.current?.focus();
   };
+
+  // Handle interim transcription — fills textarea progressively in real-time
+  const handleInterimTranscript = useCallback((text: string) => {
+    setInput(text);
+    setIsVoiceActive(true);
+  }, []);
+
+  // Auto-activate mic when TTS finishes playing (conversational flow)
+  const handleTtsEnd = useCallback(() => {
+    if (ttsEnabled && voiceInputRef.current && !voiceInputRef.current.isRecording) {
+      // Small delay so the user hears the silence before mic activates
+      setTimeout(() => {
+        voiceInputRef.current?.startRecording();
+      }, 400);
+    }
+  }, [ttsEnabled]);
 
   const modeTitle = mode === 'deblocage' ? 'Déblocage' : 'Journal du soir';
   const today = new Date().toLocaleDateString('fr-FR', {
@@ -368,6 +387,7 @@ function SessionContent() {
                 message={message}
                 ttsEnabled={ttsEnabled}
                 autoPlay={message.id === autoPlayMsgId}
+                onTtsEnd={handleTtsEnd}
               />
             </div>
           ))}
@@ -407,7 +427,11 @@ function SessionContent() {
       {/* Input area */}
       <footer className="bg-white border-t border-gray-200 px-6 py-4 safe-bottom">
         <div className="max-w-3xl mx-auto flex items-end gap-3">
-          <VoiceInput onTranscript={handleVoiceInput} />
+          <VoiceInput
+            ref={voiceInputRef}
+            onTranscript={handleVoiceInput}
+            onInterimTranscript={handleInterimTranscript}
+          />
 
           <div className="flex-1 relative">
             <textarea
@@ -415,7 +439,7 @@ function SessionContent() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Écris ici..."
+              placeholder={isVoiceActive ? 'Je t\'écoute...' : 'Écris ici...'}
               rows={1}
               disabled={isLoading}
               className="w-full resize-none rounded-2xl py-4 px-5 text-base text-gray-800 placeholder:text-gray-400 bg-gray-50 border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all disabled:opacity-50"
