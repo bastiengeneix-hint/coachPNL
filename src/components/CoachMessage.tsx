@@ -7,11 +7,12 @@ interface CoachMessageProps {
   message: Message;
   ttsEnabled?: boolean;
   autoPlay?: boolean;
+  onTtsEnd?: () => void;
 }
 
 type TtsState = 'idle' | 'loading' | 'playing' | 'error';
 
-export default function CoachMessage({ message, ttsEnabled, autoPlay }: CoachMessageProps) {
+export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd }: CoachMessageProps) {
   const isCoach = message.role === 'coach';
   const [ttsState, setTtsState] = useState<TtsState>('idle');
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -78,6 +79,8 @@ export default function CoachMessage({ message, ttsEnabled, autoPlay }: CoachMes
       audio.onended = () => {
         cleanup();
         setTtsState('idle');
+        // Signal parent that TTS finished — used to auto-activate mic
+        onTtsEnd?.();
       };
 
       audio.onerror = () => {
@@ -95,7 +98,7 @@ export default function CoachMessage({ message, ttsEnabled, autoPlay }: CoachMes
       setTtsState('error');
       setTimeout(() => setTtsState('idle'), 2000);
     }
-  }, [ttsState, message.content, cleanup]);
+  }, [ttsState, message.content, cleanup, onTtsEnd]);
 
   // Auto-play on mount if requested (only once)
   useEffect(() => {

@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
       model: 'gpt-4o-mini-tts',
       voice: 'onyx',
       input: truncated,
-      instructions: 'Tu es un coach PNL bienveillant et chaleureux. Parle de manière naturelle, posée et empathique, comme dans une vraie conversation. Utilise un ton calme et encourageant avec des pauses naturelles.',
+      instructions: 'Parle comme un ami proche dans une vraie conversation. Rythme naturel et fluide — ni trop lent, ni robotique. Enchaîne les phrases sans pauses artificielles. Ton chaleureux mais pas théâtral. Comme si tu parlais à quelqu\'un en face de toi autour d\'un café.',
+      speed: 1.15,
       response_format: 'mp3',
     });
 
