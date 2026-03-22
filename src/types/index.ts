@@ -51,6 +51,8 @@ export interface Profile {
     ce_qui_bloque: string[];
     ton: 'direct' | 'doux' | 'mix';
     tts_enabled?: boolean;
+    tts_voice?: string;
+    tts_model?: string;
   };
 }
 

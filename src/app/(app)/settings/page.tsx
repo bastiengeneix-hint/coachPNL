@@ -23,6 +23,8 @@ interface Profile {
     ce_qui_bloque: string[];
     ton: 'direct' | 'doux' | 'mix';
     tts_enabled?: boolean;
+    tts_voice?: string;
+    tts_model?: string;
   };
 }
 
@@ -43,6 +45,25 @@ const defaultProfile: Profile = {
   croyances_limitantes: [],
   preferences: { ce_qui_aide: [], ce_qui_bloque: [], ton: 'mix' },
 };
+
+const voiceOptions: { value: string; label: string; description: string }[] = [
+  { value: 'ash', label: 'Ash', description: 'Conversationnel, chaleureux' },
+  { value: 'coral', label: 'Coral', description: 'Engageant, expressif' },
+  { value: 'sage', label: 'Sage', description: 'Calme, posé, sage' },
+  { value: 'nova', label: 'Nova', description: 'Dynamique, énergique' },
+  { value: 'onyx', label: 'Onyx', description: 'Profond, autoritaire' },
+  { value: 'alloy', label: 'Alloy', description: 'Neutre, équilibré' },
+  { value: 'echo', label: 'Echo', description: 'Clair, articulé' },
+  { value: 'shimmer', label: 'Shimmer', description: 'Lumineux, optimiste' },
+  { value: 'ballad', label: 'Ballad', description: 'Doux, mélodique' },
+  { value: 'fable', label: 'Fable', description: 'Narratif, conteur' },
+];
+
+const modelOptions: { value: string; label: string; description: string }[] = [
+  { value: 'gpt-4o-mini-tts', label: '4o Mini TTS', description: 'Meilleur contrôle du ton (recommandé)' },
+  { value: 'tts-1-hd', label: 'TTS HD', description: 'Qualité audio HD — 2× plus cher' },
+  { value: 'tts-1', label: 'TTS Standard', description: 'Rapide, qualité standard — le moins cher' },
+];
 
 const tonOptions: { value: 'direct' | 'doux' | 'mix'; label: string; description: string }[] = [
   { value: 'direct', label: 'Direct', description: 'Franc, sans filtre, va droit au but' },
@@ -393,6 +414,8 @@ export default function SettingsPage() {
         {/* Audio section */}
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-800">Audio</h2>
+
+          {/* TTS toggle */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -427,6 +450,125 @@ export default function SettingsPage() {
                   />
                 </div>
               </button>
+            </div>
+          </div>
+
+          {/* Voice selector */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <div>
+              <p className="text-gray-800 text-sm font-medium">Voix du coach</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Teste chaque voix pour trouver celle qui te convient
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {voiceOptions.map((option) => {
+                const isSelected = (profile.preferences.tts_voice || 'ash') === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    onClick={async () => {
+                      const updated: Profile = {
+                        ...profile,
+                        preferences: { ...profile.preferences, tts_voice: option.value },
+                      };
+                      setProfile(updated);
+                      await updateProfile({ preferences: { ...profile.preferences, tts_voice: option.value } });
+                      showSavedIndicator();
+                    }}
+                    className={`p-3 rounded-xl text-left transition-all border-2 ${
+                      isSelected
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-gray-200 bg-white hover:border-gray-400'
+                    }`}
+                  >
+                    <span className={`text-sm font-medium ${isSelected ? 'text-teal-600' : 'text-gray-800'}`}>
+                      {option.label}
+                    </span>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{option.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Test voice button */}
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      text: 'Salut ! C\'est ta voix de coach. Comment tu la trouves ?',
+                      voice: profile.preferences.tts_voice || 'ash',
+                      model: profile.preferences.tts_model || 'gpt-4o-mini-tts',
+                    }),
+                  });
+                  if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const audio = new Audio(url);
+                    audio.onended = () => URL.revokeObjectURL(url);
+                    await audio.play();
+                  }
+                } catch (err) {
+                  console.error('Test TTS error:', err);
+                }
+              }}
+              className="w-full py-3 rounded-xl text-sm font-medium transition-colors border border-teal-300 text-teal-600 hover:bg-teal-50 active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Tester la voix
+            </button>
+          </div>
+
+          {/* Model selector */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <div>
+              <p className="text-gray-800 text-sm font-medium">Modèle audio</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Choisis le moteur de synthèse vocale
+              </p>
+            </div>
+            <div className="space-y-2">
+              {modelOptions.map((option) => {
+                const isSelected = (profile.preferences.tts_model || 'gpt-4o-mini-tts') === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    onClick={async () => {
+                      const updated: Profile = {
+                        ...profile,
+                        preferences: { ...profile.preferences, tts_model: option.value },
+                      };
+                      setProfile(updated);
+                      await updateProfile({ preferences: { ...profile.preferences, tts_model: option.value } });
+                      showSavedIndicator();
+                    }}
+                    className={`w-full p-4 rounded-xl text-left transition-all border-2 ${
+                      isSelected
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-gray-200 bg-white hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-medium ${isSelected ? 'text-teal-600' : 'text-gray-800'}`}>
+                        {option.label}
+                      </span>
+                      <div
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          isSelected ? 'border-teal-500' : 'border-gray-400'
+                        }`}
+                      >
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-teal-500" />}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{option.description}</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </section>

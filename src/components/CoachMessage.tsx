@@ -8,11 +8,13 @@ interface CoachMessageProps {
   ttsEnabled?: boolean;
   autoPlay?: boolean;
   onTtsEnd?: () => void;
+  ttsVoice?: string;
+  ttsModel?: string;
 }
 
 type TtsState = 'idle' | 'loading' | 'playing' | 'error';
 
-export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd }: CoachMessageProps) {
+export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd, ttsVoice, ttsModel }: CoachMessageProps) {
   const isCoach = message.role === 'coach';
   const [ttsState, setTtsState] = useState<TtsState>('idle');
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -44,7 +46,7 @@ export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd }
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: message.content }),
+        body: JSON.stringify({ text: message.content, voice: ttsVoice, model: ttsModel }),
       });
 
       if (!res.ok) {
@@ -98,7 +100,7 @@ export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd }
       setTtsState('error');
       setTimeout(() => setTtsState('idle'), 2000);
     }
-  }, [ttsState, message.content, cleanup, onTtsEnd]);
+  }, [ttsState, message.content, cleanup, onTtsEnd, ttsVoice, ttsModel]);
 
   // Auto-play on mount if requested (only once)
   useEffect(() => {
