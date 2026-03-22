@@ -35,8 +35,9 @@ export async function POST(request: NextRequest) {
 
     const response = await openai.audio.speech.create({
       model: 'gpt-4o-mini-tts',
-      voice: 'nova',
+      voice: 'onyx',
       input: truncated,
+      instructions: 'Tu es un coach PNL bienveillant et chaleureux. Parle de manière naturelle, posée et empathique, comme dans une vraie conversation. Utilise un ton calme et encourageant avec des pauses naturelles.',
       response_format: 'mp3',
     });
 
