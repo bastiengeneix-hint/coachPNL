@@ -435,15 +435,15 @@ function SessionContent() {
       </main>
 
       {/* Input area */}
-      <footer className="bg-white border-t border-gray-200 px-6 py-4 safe-bottom">
-        <div className="max-w-3xl mx-auto flex items-end gap-3">
+      <footer className="bg-white border-t border-gray-200 px-4 py-2 pb-[max(8px,env(safe-area-inset-bottom))]">
+        <div className="max-w-3xl mx-auto flex items-end gap-2">
           <VoiceInput
             ref={voiceInputRef}
             onTranscript={handleVoiceInput}
             onInterimTranscript={handleInterimTranscript}
           />
 
-          <div className="flex-1 relative">
+          <div className="flex-1 min-w-0">
             <textarea
               ref={textareaRef}
               value={input}
@@ -452,7 +452,7 @@ function SessionContent() {
               placeholder={isVoiceActive ? 'Je t\'écoute...' : 'Écris ici...'}
               rows={1}
               disabled={isLoading}
-              className="w-full resize-none rounded-2xl py-4 px-5 text-base text-gray-800 placeholder:text-gray-400 bg-gray-50 border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all disabled:opacity-50"
+              className="w-full resize-none rounded-2xl py-3 px-4 text-[15px] text-gray-800 placeholder:text-gray-400 bg-gray-50 border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all disabled:opacity-50"
               style={{ maxHeight: '120px' }}
             />
           </div>
