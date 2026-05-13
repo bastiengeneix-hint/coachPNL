@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
       sessionMessageCount: messages.length,
     });
 
-    console.log(`Coach strategy: move=${strategy.move}, length=${strategy.length}, tone=${strategy.tone}, question=${strategy.should_ask_question}, book=${strategy.book_concept ? 'yes' : 'no'}, avoid=${strategy.avoid.length} patterns`);
+    console.log(`Coach strategy: depth=${strategy.depth}, pushback=${strategy.user_pushback}, domain=${strategy.topic_domain}, pnl=${strategy.pnl_technique ? strategy.pnl_technique.technique : 'none'}, book=${strategy.book_concept ? 'yes' : 'no'}`);
 
     // ─── 10. BUILD DYNAMIC SYSTEM PROMPT ────────────────────────────────────
 
