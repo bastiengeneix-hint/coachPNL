@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildSystemPrompt } from '@/lib/prompts/system-prompt';
-import { getCoachingStrategy } from '@/lib/prompts/strategy-agent';
+import { runCoachingPipeline } from '@/lib/coaching/pipeline';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { SessionMode, Profile, ActiveContext, ExerciseResult } from '@/types';
@@ -127,15 +127,15 @@ export async function POST(req: NextRequest) {
       ragPassages = await retrievePassages(lastUserMessage.content, recentUserMessages);
     }
 
-    // ─── 9. AGENT STRATÉGISTE (Haiku — rapide) ─────────────────────────────
-    // Analyse la conversation et décide la stratégie AVANT que le coach parle
+    // ─── 9. PIPELINE MULTI-AGENTS ────────────────────────────────────────
+    // Session Tracker (code) → Diagnostic (Haiku) → Intervention (Haiku)
 
     const recentCoachMessages = messages
       .filter((m: { role: string }) => m.role === 'assistant')
-      .slice(-4)
+      .slice(-6)
       .map((m: { content: string }) => m.content);
 
-    const strategy = await getCoachingStrategy({
+    const intelligence = await runCoachingPipeline({
       apiKey: getAnthropicKey(),
       userName,
       userMessage: lastUserMessage?.content || '',
@@ -147,10 +147,8 @@ export async function POST(req: NextRequest) {
         patterns_sabotage: profileData.patterns_sabotage,
         croyances_limitantes: profileData.croyances_limitantes,
       },
-      sessionMessageCount: messages.length,
+      totalMessages: messages.length,
     });
-
-    console.log(`Coach strategy: depth=${strategy.depth}, pushback=${strategy.user_pushback}, domain=${strategy.topic_domain}, pnl=${strategy.pnl_technique ? strategy.pnl_technique.technique : 'none'}, book=${strategy.book_concept ? 'yes' : 'no'}`);
 
     // ─── 10. BUILD DYNAMIC SYSTEM PROMPT ────────────────────────────────────
 
@@ -170,7 +168,7 @@ export async function POST(req: NextRequest) {
         actions: Array<{ text: string; done: boolean }>;
         coach_summary: string | null;
       }>,
-      strategy,
+      intelligence,
     });
 
     const sessionsWithMessages = (recentSessions || []).filter(

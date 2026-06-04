@@ -1,5 +1,5 @@
 import { Profile, ActiveContext, SessionMode, ExerciseResult } from '@/types';
-import { CoachingStrategy } from './strategy-agent';
+import { CoachingIntelligence } from '@/lib/coaching/pipeline';
 
 interface RAGPassage {
   livre: string;
@@ -66,44 +66,62 @@ function buildPNLBlock(userName: string): string {
 Quand tu utilises une technique ou un concept, ne le nomme pas — pratique-le. Guide ${userName} à travers le process.`;
 }
 
-// ─── BLOC STRATÉGIE (dynamique — vient de l'agent stratégiste) ──────────────
+// ─── BLOC INTELLIGENCE (dynamique — vient du pipeline multi-agents) ─────────
+// 3 sources : Diagnostic (pattern PNL) + Intervention (technique + plan) + Session Tracker (boucles)
 
-function buildStrategyBlock(userName: string, strategy: CoachingStrategy): string {
-  const parts: string[] = [`## Direction pour ce message`];
+function buildIntelligenceBlock(userName: string, intel: CoachingIntelligence): string {
+  const { diagnostic, intervention, session } = intel;
+  const parts: string[] = [];
 
-  if (strategy.user_pushback) {
-    parts.push(`\n${userName} n'est PAS d'accord avec ton analyse précédente. Reconnais que tu t'es trompé. Reviens à ce que LUI dit.`);
+  // ── DIAGNOSTIC : ce qui se passe vraiment
+  parts.push(`## Ton analyse interne (ne la verbalise pas telle quelle)
+
+**Pattern détecté :** ${diagnostic.core_pattern}
+**Niveau Dilts :** ${diagnostic.dilts_level}
+**Ce qui se passe vraiment :** ${diagnostic.real_issue || 'Écoute et observe.'}
+**État émotionnel :** ${diagnostic.emotional_state}`);
+
+  // ── SITUATIONAL AWARENESS
+  if (diagnostic.user_pushback) {
+    parts.push(`\n⚠️ ${userName} CONTESTE ton analyse. Reconnais que tu t'es trompé. Change de direction. Reviens à CE QUE LUI dit.`);
   }
 
-  if (strategy.topic_domain === 'personal') {
-    parts.push(`\nSujet personnel — reste dans le perso. Pas de lien avec le travail.`);
+  if (diagnostic.topic_domain === 'personal') {
+    parts.push(`\n📌 Sujet PERSONNEL (couple, famille, quotidien). Accompagne tel quel. Ne relie PAS au travail.`);
   }
 
-  if (strategy.depth === 'dig') {
-    parts.push(`\nSujet profond ou business concret. Sois CASH. Prends position si nécessaire. Lance un process PNL complet, pas des questions en boucle.`);
+  // ── INTERVENTION : quoi faire et comment
+  const stanceLabels: Record<string, string> = {
+    explore: 'Explorer — pose des questions ciblées, ouvre de nouveaux angles',
+    guide: 'Guider — emmène dans un process PNL structuré étape par étape',
+    confront: 'Confronter — sois cash, prends position, challenge le raisonnement',
+    support: 'Soutenir — valide le progrès et ancre la prise de conscience',
+  };
+
+  parts.push(`\n## Plan d'intervention
+
+**Technique :** ${intervention.technique}
+**Posture :** ${stanceLabels[intervention.stance] || stanceLabels.explore}
+**Objectif :** ${intervention.goal}
+
+**Étapes à suivre :**
+${intervention.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`);
+
+  if (intervention.book_concept) {
+    parts.push(`\n**Concept à mobiliser :** ${intervention.book_concept.idea}\n→ ${intervention.book_concept.how_to_use}`);
   }
 
-  if (strategy.pnl_technique) {
-    parts.push(`\nProcess PNL à utiliser : ${strategy.pnl_technique.technique}\nÉtapes : ${strategy.pnl_technique.how_to_apply}\nGuide ${userName} à travers ce process — pas juste une question.`);
+  // ── ANTI-BOUCLE
+  if (session.is_looping) {
+    parts.push(`\n⚠️ BOUCLE DÉTECTÉE — ${session.loop_detail}
+Tu DOIS changer radicalement d'approche. Si tu posais des questions → passe à un exercice PNL guidé. Si tu observais → prends position. CASSE LE PATTERN.`);
   }
 
-  if (strategy.book_concept) {
-    parts.push(`\nConcept à mobiliser : ${strategy.book_concept.idea} — ${strategy.book_concept.how_to_use}`);
+  if (session.techniques_used.length > 0) {
+    parts.push(`\nTechniques déjà utilisées dans cette session : ${session.techniques_used.join(', ')}. Varie.`);
   }
 
-  if (strategy.subtext) {
-    parts.push(`\nCe que tu entends sous les mots : ${strategy.subtext}`);
-  }
-
-  if (strategy.avoid.length > 0) {
-    parts.push(`\n⚠️ ATTENTION BOUCLE — tu as déjà dit/fait : ${strategy.avoid.join(', ')}. Change RADICALEMENT d'approche. Pas la même structure, pas le même angle.`);
-  }
-
-  if (strategy.specific_instruction) {
-    parts.push(`\n→ ${strategy.specific_instruction}`);
-  }
-
-  return parts.join('');
+  return parts.join('\n');
 }
 
 // ─── BLOC PROFIL ────────────────────────────────────────────────────────────
@@ -299,26 +317,27 @@ export function buildSystemPrompt(params: {
   isFirstMessage: boolean;
   exerciseResults?: ExerciseResult[];
   recentSessions?: RecentSession[];
-  strategy?: CoachingStrategy;
+  intelligence?: CoachingIntelligence;
 }): string {
   const ton = params.profile.preferences?.ton || 'mix';
 
   const blocks = [
+    // Qui tu es et comment tu coaches
     buildIdentityBlock(params.userName, ton as TonPreference),
     buildPNLBlock(params.userName),
 
-    // Contexte — ce que tu sais
+    // Ce que tu sais de lui
     buildProfileBlock(params.userName, params.profile),
     buildContextBlock(params.activeContext),
     buildConversationHistoryBlock(params.userName, params.recentSessions || []),
     buildExerciseBlock(params.userName, params.exerciseResults || []),
     buildRAGBlock(params.ragPassages, params.userName),
 
-    // Mode
+    // Mode de session
     buildModeBlock(params.mode, params.isFirstMessage),
 
-    // Direction du stratégiste (léger, pas prescriptif)
-    params.strategy ? buildStrategyBlock(params.userName, params.strategy) : '',
+    // Intelligence multi-agents : diagnostic + intervention + session tracking
+    params.intelligence ? buildIntelligenceBlock(params.userName, params.intelligence) : '',
   ];
 
   return blocks.filter(Boolean).join('\n\n---\n\n');
