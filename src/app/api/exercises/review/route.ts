@@ -5,6 +5,8 @@ import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import Anthropic from '@anthropic-ai/sdk';
 import { getExerciseDefinition } from '@/lib/exercises/definitions';
+import { ANALYSIS_MODEL } from '@/lib/ai/models';
+import { parseModelJson } from '@/lib/ai/json';
 
 function getAnthropic() {
   const key = process.env.INNER_COACH_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
       : '';
 
     const response = await getAnthropic().messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: ANALYSIS_MODEL,
       max_tokens: 600,
       system: `Tu es un coach PNL bienveillant et perspicace. Tu donnes un feedback structuré après un exercice de développement personnel. Sois chaleureux mais incisif. Tutoie l'utilisateur.
 
@@ -75,26 +77,21 @@ ${profileBlock}${ragBlock}`,
       return NextResponse.json({ error: 'No response from coach' }, { status: 500 });
     }
 
-    try {
-      // Strip markdown code blocks (```json...```) that Claude sometimes adds
-      let raw = textContent.text.trim();
-      const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (fenceMatch) raw = fenceMatch[1].trim();
-
-      const review = JSON.parse(raw);
-      return NextResponse.json({
-        observation: review.observation || '',
-        question: review.question || '',
-        piste: review.piste || '',
-      });
-    } catch {
-      // If JSON parsing fails, return a structured fallback
+    const review = parseModelJson<Record<string, string>>(textContent.text);
+    if (!review) {
+      // Pas de JSON exploitable : on rend le texte brut plutôt que rien.
       return NextResponse.json({
         observation: textContent.text.replace(/```(?:json)?|```/g, '').trim(),
         question: '',
         piste: '',
       });
     }
+
+    return NextResponse.json({
+      observation: review.observation || '',
+      question: review.question || '',
+      piste: review.piste || '',
+    });
   } catch (error) {
     console.error('Exercise review error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

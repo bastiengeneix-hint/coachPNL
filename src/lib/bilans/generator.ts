@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { BilanContent, BilanType } from '@/types';
+import { ANALYSIS_MODEL } from '@/lib/ai/models';
+import { parseModelJson, stringArray } from '@/lib/ai/json';
 
 function getAnthropic() {
   return new Anthropic({
@@ -102,7 +104,7 @@ ${sessionsSummary || 'Aucune session sur cette période.'}`;
 
   try {
     const response = await getAnthropic().messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: ANALYSIS_MODEL,
       max_tokens: 1500,
       system: BILAN_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
@@ -111,24 +113,21 @@ ${sessionsSummary || 'Aucune session sur cette période.'}`;
     const textContent = response.content.find((block: { type: string }) => block.type === 'text') as { type: 'text'; text: string } | undefined;
     if (!textContent) return defaultBilanContent(sessions.length, exercisesCount, doneActions, totalActions);
 
-    // Strip markdown code blocks (```json...```) that Claude sometimes adds
-    let rawText = textContent.text.trim();
-    const fenceMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) rawText = fenceMatch[1].trim();
+    const parsed = parseModelJson<Record<string, unknown>>(textContent.text);
+    if (!parsed) return defaultBilanContent(sessions.length, exercisesCount, doneActions, totalActions);
 
-    const parsed = JSON.parse(rawText);
     return {
-      summary: parsed.summary || '',
-      themes_dominants: Array.isArray(parsed.themes_dominants) ? parsed.themes_dominants : [],
-      breakthroughs: Array.isArray(parsed.breakthroughs) ? parsed.breakthroughs : [],
+      summary: (parsed.summary as string) || '',
+      themes_dominants: stringArray(parsed.themes_dominants, 8),
+      breakthroughs: stringArray(parsed.breakthroughs, 8),
       actions_completed: typeof parsed.actions_completed === 'number' ? parsed.actions_completed : doneActions,
       actions_total: typeof parsed.actions_total === 'number' ? parsed.actions_total : totalActions,
       sessions_count: sessions.length,
       exercises_done: exercisesCount,
-      profile_evolution: parsed.profile_evolution || '',
-      coach_note: parsed.coach_note || '',
-      coach_lesson: parsed.coach_lesson || '',
-      next_action: parsed.next_action || '',
+      profile_evolution: (parsed.profile_evolution as string) || '',
+      coach_note: (parsed.coach_note as string) || '',
+      coach_lesson: (parsed.coach_lesson as string) || '',
+      next_action: (parsed.next_action as string) || '',
     };
   } catch (error) {
     console.error('Bilan generation error:', error);

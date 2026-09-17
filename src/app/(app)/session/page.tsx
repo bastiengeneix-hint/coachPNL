@@ -148,7 +148,7 @@ function SessionContent() {
       const errorSession = addMessage(
         newSession,
         'coach',
-        `Désolée, je n'ai pas pu démarrer la session : ${errMsg}`
+        `Je n'ai pas pu démarrer la séance : ${errMsg}`
       );
       setSession(errorSession);
     } finally {
@@ -180,6 +180,9 @@ function SessionContent() {
           messages: formatMessagesForAPI(withUserMsg.messages),
           mode,
           isFirstMessage: false,
+          // Le coach a besoin de savoir depuis combien de temps la séance dure
+          // pour savoir s'il ouvre encore ou s'il doit faire atterrir.
+          startedAt: withUserMsg.messages[0]?.timestamp ?? null,
         }),
       });
 
@@ -205,7 +208,7 @@ function SessionContent() {
       const errorSession = addMessage(
         withUserMsg,
         'coach',
-        "Désolée, une erreur est survenue. Pouvez-vous reformuler ?"
+        "Il y a eu un problème de mon côté. Tu peux renvoyer ton message ?"
       );
       setSession(errorSession);
     } finally {

@@ -22,6 +22,10 @@ export default function HomePage() {
 
   useEffect(() => {
     async function loadData() {
+      // Les séances quittées sans « Terminer » n'étaient jamais analysées : le
+      // coach perdait leur contenu. On les rattrape ici, en tâche de fond.
+      fetch('/api/sessions/sweep', { method: 'POST' }).catch(() => {});
+
       try {
         const [remindersRes, activeRes] = await Promise.all([
           fetch('/api/reminders'),

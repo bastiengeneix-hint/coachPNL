@@ -1,7 +1,38 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { Message } from '@/types';
+
+// ─── EXERCICES CLIQUABLES ───────────────────────────────────────────────────
+// Le coach peut proposer un des exercices de l'app en collant un marqueur
+// [[exercice:roue_vie]] dans son message. Avant, les exercices existaient dans
+// un coin de l'app et la conversation n'y menait jamais.
+
+const EXERCISE_LINKS: Record<string, { label: string; href: string }> = {
+  roue_vie: { label: 'Roue de la Vie', href: '/exercices/roue' },
+  triangle_equilibre: { label: "Triangle d'Équilibre", href: '/exercices/triangle' },
+  ikigai: { label: 'IKIGAI', href: '/exercices/ikigai' },
+  systeme12: { label: 'Système 1 / Système 2', href: '/exercices/systeme12' },
+};
+
+const EXERCISE_MARKER = /\[\[exercice\s*:\s*([a-z0-9_]+)\]\]/gi;
+
+function splitExerciseMarkers(content: string): { text: string; exercises: string[] } {
+  const exercises: string[] = [];
+
+  const text = content
+    .replace(EXERCISE_MARKER, (_match, id: string) => {
+      const key = id.toLowerCase();
+      if (EXERCISE_LINKS[key] && !exercises.includes(key)) exercises.push(key);
+      return '';
+    })
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { text, exercises };
+}
 
 interface CoachMessageProps {
   message: Message;
@@ -16,6 +47,10 @@ type TtsState = 'idle' | 'loading' | 'playing' | 'error';
 
 export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd, ttsVoice, ttsModel }: CoachMessageProps) {
   const isCoach = message.role === 'coach';
+  const { text: displayText, exercises } = useMemo(
+    () => splitExerciseMarkers(message.content),
+    [message.content]
+  );
   const [ttsState, setTtsState] = useState<TtsState>('idle');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -46,7 +81,7 @@ export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd, 
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: message.content, voice: ttsVoice, model: ttsModel }),
+        body: JSON.stringify({ text: displayText, voice: ttsVoice, model: ttsModel }),
       });
 
       if (!res.ok) {
@@ -100,7 +135,7 @@ export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd, 
       setTtsState('error');
       setTimeout(() => setTtsState('idle'), 2000);
     }
-  }, [ttsState, message.content, cleanup, onTtsEnd, ttsVoice, ttsModel]);
+  }, [ttsState, displayText, cleanup, onTtsEnd, ttsVoice, ttsModel]);
 
   // Auto-play on mount if requested (only once)
   useEffect(() => {
@@ -133,8 +168,26 @@ export default function CoachMessage({ message, ttsEnabled, autoPlay, onTtsEnd, 
         }`}
       >
         <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
-          {message.content}
+          {displayText}
         </p>
+
+        {isCoach && exercises.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {exercises.map((key) => (
+              <Link
+                key={key}
+                href={EXERCISE_LINKS[key].href}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 text-sm font-medium hover:bg-teal-100 transition-colors"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+                {EXERCISE_LINKS[key].label}
+              </Link>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-2 mt-1.5">
           <span
             className={`text-[11px] ${

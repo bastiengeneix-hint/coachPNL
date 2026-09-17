@@ -27,13 +27,17 @@ export function buildActiveContext(sessions: Session[]): ActiveContext {
     .slice(0, 5)
     .map(([theme]) => theme);
 
-  // Trouver l'exercice en attente le plus récent
+  // Trouver l'exercice en attente le plus récent.
+  // Passé 14 jours on l'oublie : rien ne mettait jamais `exercice_fait` à true,
+  // donc le coach relançait indéfiniment un exercice proposé des mois plus tôt.
+  const PENDING_EXERCICE_MAX_DAYS = 14;
   let pendingExercice: string | null = null;
   for (const session of sorted) {
-    if (session.exercice_propose && !session.exercice_fait) {
-      pendingExercice = session.exercice_propose;
-      break;
-    }
+    if (!session.exercice_propose || session.exercice_fait) continue;
+    const ageDays = (Date.now() - new Date(session.date).getTime()) / 86400000;
+    if (ageDays > PENDING_EXERCICE_MAX_DAYS) break;
+    pendingExercice = session.exercice_propose;
+    break;
   }
 
   // Construire le résumé des dernières sessions

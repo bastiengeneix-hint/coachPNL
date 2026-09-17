@@ -4,6 +4,11 @@
 -- 1. Add missing columns to sessions table
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS coach_summary TEXT;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS actions JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended BOOLEAN NOT NULL DEFAULT false;
+
+-- 1b. exercise_reminders.message : l'API l'écrivait, la colonne n'existait pas.
+--     Résultat, aucun rappel d'exercice n'a jamais pu être créé (PGRST204).
+ALTER TABLE exercise_reminders ADD COLUMN IF NOT EXISTS message TEXT;
 
 -- 2. Create exercise_results table
 CREATE TABLE IF NOT EXISTS exercise_results (

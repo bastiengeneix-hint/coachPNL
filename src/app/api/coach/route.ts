@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import Anthropic from '@anthropic-ai/sdk';
-import { buildSystemPrompt } from '@/lib/prompts/system-prompt';
-import { getCoachingStrategy } from '@/lib/prompts/strategy-agent';
+import { buildSystemPromptParts } from '@/lib/prompts/system-prompt';
+import { getCoachingStrategy, openingStrategy } from '@/lib/prompts/strategy-agent';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
+import { COACH_MODEL } from '@/lib/ai/models';
+import { computeSessionArc } from '@/lib/coach/session-arc';
 import { SessionMode, Profile, ActiveContext, ExerciseResult } from '@/types';
 
 function getAnthropicKey(): string {
@@ -16,9 +18,13 @@ function getAnthropicKey(): string {
   return key;
 }
 
-function getAnthropic() {
-  return new Anthropic({ apiKey: getAnthropicKey() });
-}
+// Le coach a le droit de développer quand le superviseur le demande ; il n'a pas
+// le droit d'être coupé au milieu d'une phrase.
+const MAX_TOKENS_BY_LENGTH: Record<string, number> = {
+  short: 400,
+  medium: 800,
+  long: 1600,
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { messages, mode, isFirstMessage } = await req.json();
+    const { messages, mode, isFirstMessage, startedAt } = await req.json();
 
     // 3. Create Supabase client
     const supabase = createServerClient();
@@ -107,6 +113,27 @@ export async function POST(req: NextRequest) {
       console.error('Coach: failed to fetch recent sessions:', recentSessionsError);
     }
 
+    // 6c. Depuis quand on se connaît, et combien de séances — la mémoire du lien.
+    const { data: firstSessionRow, count: sessionsTotal } = await supabase
+      .from('sessions')
+      .select('date', { count: 'exact' })
+      .eq('user_id', session.user.id)
+      .order('date', { ascending: true })
+      .limit(1);
+
+    // 6d. Engagements non soldés : c'est ce qui permet au coach de demander des comptes.
+    const pendingActions: string[] = [];
+    for (const s of (recentSessions || []) as unknown as Array<{ date: string; actions?: Array<{ text: string; done: boolean }> }>) {
+      const actions = Array.isArray(s.actions) ? s.actions : [];
+      for (const a of actions) {
+        if (!a.done && a.text && pendingActions.length < 5) {
+          const daysAgo = Math.round((Date.now() - new Date(s.date).getTime()) / 86400000);
+          const when = daysAgo === 0 ? "aujourd'hui" : daysAgo === 1 ? 'hier' : `il y a ${daysAgo} jours`;
+          pendingActions.push(`${a.text} (pris ${when})`);
+        }
+      }
+    }
+
     // 7. Fetch recent exercise results
     const { data: exerciseResults } = await supabase
       .from('exercise_results')
@@ -127,34 +154,50 @@ export async function POST(req: NextRequest) {
       ragPassages = await retrievePassages(lastUserMessage.content, recentUserMessages);
     }
 
-    // ─── 9. AGENT STRATÉGISTE (Haiku — rapide) ─────────────────────────────
-    // Analyse la conversation et décide la stratégie AVANT que le coach parle
+    // ─── 9. ARC DE SÉANCE (déterministe, sans modèle) ──────────────────────
 
-    const recentCoachMessages = messages
-      .filter((m: { role: string }) => m.role === 'assistant')
-      .slice(-4)
-      .map((m: { content: string }) => m.content);
-
-    const strategy = await getCoachingStrategy({
-      apiKey: getAnthropicKey(),
-      userName,
-      userMessage: lastUserMessage?.content || '',
-      recentCoachMessages,
-      recentUserMessages,
-      ragPassages: ragPassages.map((p) => ({ livre: p.livre, content: p.content })),
-      profile: {
-        projets: profileData.projets,
-        patterns_sabotage: profileData.patterns_sabotage,
-        croyances_limitantes: profileData.croyances_limitantes,
-      },
-      sessionMessageCount: messages.length,
+    const arc = computeSessionArc({
+      messageCount: Array.isArray(messages) ? messages.length : 0,
+      startedAt: typeof startedAt === 'number' ? startedAt : null,
+      mode: mode as SessionMode,
     });
 
-    console.log(`Coach strategy: move=${strategy.move}, length=${strategy.length}, tone=${strategy.tone}, question=${strategy.should_ask_question}, book=${strategy.book_concept ? 'yes' : 'no'}, avoid=${strategy.avoid.length} patterns`);
+    // ─── 10. SUPERVISEUR (Haiku — rapide) ──────────────────────────────────
+    // Il voit la conversation dans l'ordre, la phase, les engagements, et il
+    // décide : mouvement, protocole PNL + étape, risque, mots à reprendre.
 
-    // ─── 10. BUILD DYNAMIC SYSTEM PROMPT ────────────────────────────────────
+    // Rien à superviser sur le message d'ouverture : on ne paie ni l'appel ni l'attente.
+    const strategy = !lastUserMessage?.content
+      ? openingStrategy(mode === 'journal' ? 'journal' : 'deblocage')
+      : await getCoachingStrategy({
+          apiKey: getAnthropicKey(),
+          userName,
+          userMessage: lastUserMessage.content,
+          messages: (messages || []) as Array<{ role: string; content: string }>,
+          ragPassages: ragPassages.map((p) => ({ livre: p.livre, content: p.content })),
+          profile: {
+            projets: profileData.projets,
+            patterns_sabotage: profileData.patterns_sabotage,
+            croyances_limitantes: profileData.croyances_limitantes,
+            barrieres_ulp: profileData.barrieres_ulp,
+          },
+          pendingEngagements: pendingActions,
+          recentThemes: contextData.recent_themes,
+          phase: arc.phase,
+          shouldLand: arc.shouldLand,
+          exchangeCount: arc.exchangeCount,
+          elapsedMinutes: arc.elapsedMinutes,
+        });
 
-    const systemPrompt = buildSystemPrompt({
+    console.log(
+      `Coach strategy: phase=${arc.phase} move=${strategy.move} protocol=${strategy.protocol ?? 'none'}:${strategy.protocol_step} len=${strategy.length} tone=${strategy.tone} q=${strategy.should_ask_question} intensity=${strategy.emotion_intensity} risk=${strategy.risk} book=${strategy.book_concept ? 'yes' : 'no'} avoid=${strategy.avoid.length}`
+    );
+
+    // ─── 11. PROMPT SYSTÈME ────────────────────────────────────────────────
+    // Deux blocs : le bloc stable (qui est le coach) est mis en cache côté API,
+    // le bloc contextuel change à chaque tour.
+
+    const { stable, contextual } = buildSystemPromptParts({
       userName,
       profile: profileData,
       activeContext: contextData,
@@ -171,14 +214,20 @@ export async function POST(req: NextRequest) {
         coach_summary: string | null;
       }>,
       strategy,
+      arc,
+      pendingActions,
+      sessionsTotal: sessionsTotal ?? 0,
+      firstSessionDate: firstSessionRow?.[0]?.date ?? null,
     });
 
     const sessionsWithMessages = (recentSessions || []).filter(
       (s: Record<string, unknown>) => Array.isArray(s.messages) && (s.messages as unknown[]).length > 0
     );
-    console.log(`Coach: ${sessionsWithMessages.length} sessions with history. System prompt: ${systemPrompt.length} chars`);
+    console.log(
+      `Coach: ${sessionsWithMessages.length} sessions with history. Prompt: ${stable.length} chars stable (cached) + ${contextual.length} chars contextual`
+    );
 
-    // ─── 11. CALL COACH (Sonnet — with focused strategy) ───────────────────
+    // ─── 12. APPEL DU COACH ────────────────────────────────────────────────
 
     const apiMessages =
       messages.length === 0
@@ -188,14 +237,19 @@ export async function POST(req: NextRequest) {
             content: m.content,
           }));
 
-    const response = await getAnthropic().messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system: systemPrompt,
+    const anthropic = new Anthropic({ apiKey: getAnthropicKey() });
+
+    const response = await anthropic.messages.create({
+      model: COACH_MODEL,
+      max_tokens: MAX_TOKENS_BY_LENGTH[strategy.length] ?? 800,
+      system: [
+        { type: 'text', text: stable, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: contextual },
+      ],
       messages: apiMessages,
     });
 
-    // 12. Extract text response
+    // 13. Extract text response
     const textContent = response.content.find((block) => block.type === 'text');
     const messageText = textContent ? textContent.text : '';
 
@@ -206,7 +260,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ message: messageText });
+    return NextResponse.json({
+      message: messageText,
+      // Méta non affichée — utile pour déboguer une séance qui part de travers.
+      meta: {
+        phase: arc.phase,
+        move: strategy.move,
+        protocol: strategy.protocol,
+        protocol_step: strategy.protocol_step,
+        risk: strategy.risk,
+      },
+    });
   } catch (error) {
     console.error('Coach API error:', error);
     const message = error instanceof Error ? error.message : 'Erreur interne du serveur';

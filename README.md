@@ -21,6 +21,11 @@ Ouvrir [http://localhost:3000](http://localhost:3000).
 2. Executer `src/supabase-schema.sql` dans le SQL Editor
 3. Copier les cles dans `.env`
 
+**Base deja creee ?** Executer `src/migration-add-missing-tables.sql` : il est idempotent et
+rattrape les colonnes ajoutees apres coup (`sessions.ended`, `exercise_reminders.message`).
+Sans `sessions.ended`, aucune seance ne peut etre sauvegardee ; sans `exercise_reminders.message`,
+aucun rappel d'exercice ne peut etre cree.
+
 ## Architecture
 
 ```
@@ -51,19 +56,69 @@ src/
     Providers.tsx          # SessionProvider NextAuth
     ui/                   # Design system (GlassCard, GradientButton, etc.)
   lib/
+    ai/                   # IDs de modeles centralises + parsing JSON des reponses
     auth/                 # Config NextAuth
     supabase/             # Clients + types Supabase
-    memory/               # Store async (API calls)
-    prompts/              # System prompt dynamique (5 blocs)
-    coach/                # Logique de session
+    memory/               # Store async (API calls) + evolution du profil
+    pnl/                  # Bibliotheque de protocoles PNL (15 protocoles, etape par etape)
+    prompts/              # Prompt systeme (bloc stable + bloc contextuel) + superviseur
+    coach/                # Arc de seance, filet de securite, analyse de seance
     rag/                  # Pipeline RAG (ingest PDF + retrieve vectoriel)
   types/                  # Types TypeScript
 ```
+
+## Le coach
+
+Chaque message passe par trois etages. Le detail est dans le code, voici la carte.
+
+**1. Superviseur** — `lib/prompts/strategy-agent.ts` (Haiku, rapide)
+Il lit la conversation dans l'ordre, la phase de seance, les engagements non soldes et les
+passages de lecture trouves par le RAG. Il ne parle jamais au coache : il rend une consigne
+(`move`, `length`, `tone`, protocole PNL + etape, objectif de seance, mots exacts a reprendre,
+intensite emotionnelle, niveau de risque, patterns a eviter).
+
+**2. Prompt systeme** — `lib/prompts/system-prompt.ts`
+Deux parties. La partie **stable** (identite, voix, posture, formation PNL, limite du role) ne
+change pas d'un message a l'autre : elle est mise en cache cote API. La partie **contextuelle**
+(profil, historique reel, engagements, lectures, phase, protocole en cours, consigne) est
+reconstruite a chaque tour.
+
+**3. Coach** — `app/api/coach/route.ts` (Sonnet)
+Il parle. Sa longueur maximale est calee sur la consigne du superviseur.
+
+Trois briques transverses :
+
+- **Protocoles PNL** (`lib/pnl/protocols.ts`) : 15 protocoles decoupes en etapes (objectif bien
+  formule, ancrage, recadrage en six pas, parties en conflit, positions de perception, ligne du
+  temps, sous-modalites, swish, niveaux logiques, SCORE, croyance limitante, Upper Limit Problem,
+  pont vers le futur...). Le superviseur en choisit un, le coach n'en recoit qu'un seul et le
+  conduit **une etape par message**, sans jamais le nommer.
+- **Arc de seance** (`lib/coach/session-arc.ts`) : ouverture → cadrage → exploration → travail →
+  atterrissage → cloture, calcule sans modele a partir du nombre d'echanges et du temps ecoule.
+  C'est ce qui empeche une seance de s'arreter sans rien de concret.
+- **Filet de securite** (`lib/coach/safety.ts`) : detection en deux temps (filtre local + jugement
+  du superviseur, le plus grave gagne). En detresse, aucune technique. En crise, le coach lache
+  tout, reste present et oriente vers de l'aide humaine (3114, 15, 112).
+
+Le coach peut aussi proposer un exercice de l'app en collant un marqueur `[[exercice:roue_vie]]`
+dans son message : `components/CoachMessage.tsx` le transforme en bouton et le retire du texte lu
+par la synthese vocale.
 
 ## Modes
 
 - **Deblocage** : decharge emotionnelle en temps reel, questions chirurgicales
 - **Journal du soir** : rituel nocturne, entree vocale, accompagnement doux
+
+## Memoire
+
+- **Fin de seance** : l'analyse extrait insights, themes, actions, exercice propose, et fait evoluer
+  le profil (croyances, patterns, projets, barrieres ULP, lexique — les mots que l'utilisateur
+  emploie pour se decrire, que le coach reprend tels quels).
+- **Seances abandonnees** : une seance quittee sans cliquer sur « Terminer » est rattrapee au
+  chargement de l'accueil (`POST /api/sessions/sweep`), analysee puis refermee. Avant, tout ce qui
+  n'etait pas proprement termine etait perdu.
+- **Engagements** : les actions non faites des 14 derniers jours sont injectees dans le prompt, et
+  le superviseur decide quand le coach demande ou ca en est.
 
 ## Fonctionnalites v2
 

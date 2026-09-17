@@ -22,6 +22,8 @@ interface Profile {
     ce_qui_aide: string[];
     ce_qui_bloque: string[];
     ton: 'direct' | 'doux' | 'mix';
+    coach_name?: string;
+    lexique?: string[];
     tts_enabled?: boolean;
     tts_voice?: string;
     tts_model?: string;
@@ -235,6 +237,17 @@ export default function SettingsPage() {
     showSavedIndicator();
   };
 
+  const handleCoachNameChange = async (raw: string) => {
+    const name = raw.trim().slice(0, 24);
+    const updated: Profile = {
+      ...profile,
+      preferences: { ...profile.preferences, coach_name: name },
+    };
+    setProfile(updated);
+    await updateProfile({ preferences: { ...profile.preferences, coach_name: name } });
+    showSavedIndicator();
+  };
+
   const handleTonChange = async (newTon: 'direct' | 'doux' | 'mix') => {
     const updated: Profile = {
       ...profile,
@@ -362,6 +375,27 @@ export default function SettingsPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-6 space-y-6">
+        {/* Coach identity */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-800 mb-1">
+            Ton coach
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Le prénom qu&apos;il porte quand il te parle.
+          </p>
+          <input
+            type="text"
+            defaultValue={profile.preferences.coach_name || ''}
+            onBlur={(e) => {
+              const next = e.target.value.trim();
+              if (next !== (profile.preferences.coach_name || '')) handleCoachNameChange(next);
+            }}
+            placeholder="Marc"
+            maxLength={24}
+            className="w-full rounded-2xl py-3 px-4 text-[15px] text-gray-800 placeholder:text-gray-400 bg-white border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all"
+          />
+        </section>
+
         {/* Coaching style section */}
         <section>
           <h2 className="text-lg font-semibold text-gray-800 mb-4">

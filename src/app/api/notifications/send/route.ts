@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
               sub.subscription as never,
               JSON.stringify({
                 title: 'Inner Coach',
-                body: `Rappel : ${reminder.exercise_description}`,
+                body: reminder.message || `Rappel : ${reminder.exercise_description}`,
                 tag: `reminder-${reminder.id}`,
                 url: '/exercices',
               })

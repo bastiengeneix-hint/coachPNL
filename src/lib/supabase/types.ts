@@ -97,6 +97,7 @@ export interface Database {
           summary: string | null;
           coach_summary: string | null;
           actions: Json;
+          ended: boolean;
         };
         Insert: {
           id?: string;
@@ -111,6 +112,7 @@ export interface Database {
           summary?: string | null;
           coach_summary?: string | null;
           actions?: Json;
+          ended?: boolean;
         };
         Update: {
           id?: string;
@@ -125,6 +127,7 @@ export interface Database {
           summary?: string | null;
           coach_summary?: string | null;
           actions?: Json;
+          ended?: boolean;
         };
         Relationships: [
           {
@@ -253,6 +256,7 @@ export interface Database {
           user_id: string;
           session_id: string | null;
           exercise_description: string;
+          message: string | null;
           frequency: string;
           start_date: string;
           end_date: string;
@@ -265,6 +269,7 @@ export interface Database {
           user_id: string;
           session_id?: string | null;
           exercise_description: string;
+          message: string | null;
           frequency: string;
           start_date?: string;
           end_date: string;
@@ -277,6 +282,7 @@ export interface Database {
           user_id?: string;
           session_id?: string | null;
           exercise_description?: string;
+          message?: string | null;
           frequency?: string;
           start_date?: string;
           end_date?: string;

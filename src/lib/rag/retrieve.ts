@@ -4,6 +4,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import { UTILITY_MODEL } from '@/lib/ai/models';
 
 function getOpenAI() {
   return new OpenAI({
@@ -32,7 +33,7 @@ async function reformulateQuery(
     const context = recentMessages.slice(-3).join('\n');
 
     const response = await getAnthropic().messages.create({
-      model: 'claude-haiku-4-20250414',
+      model: UTILITY_MODEL,
       max_tokens: 150,
       system: `Tu es un assistant de reformulation. Reformule le message suivant en une requête de recherche optimisée pour la recherche sémantique dans une base de connaissances en développement personnel et PNL. Extrais l'intention émotionnelle et les thèmes profonds. Garde le français. Réponds UNIQUEMENT avec la requête reformulée, rien d'autre.`,
       messages: [

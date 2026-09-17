@@ -50,6 +50,10 @@ export interface Profile {
     ce_qui_aide: string[];
     ce_qui_bloque: string[];
     ton: 'direct' | 'doux' | 'mix';
+    /** Prénom du coach — l'incarnation commence par un nom. */
+    coach_name?: string;
+    /** Ses mots à lui, ceux qu'il emploie pour se décrire. Le coach les reprend tels quels. */
+    lexique?: string[];
     tts_enabled?: boolean;
     tts_voice?: string;
     tts_model?: string;
@@ -150,6 +154,11 @@ export interface ProfileEvolution {
   add_patterns?: string[];
   remove_patterns?: string[];
   add_projets?: string[];
+  /** Barrières ULP (Hendricks) — le champ existait en base mais rien ne l'alimentait. */
+  add_barrieres?: string[];
+  remove_barrieres?: string[];
+  /** Expressions récurrentes de l'utilisateur, pour que le coach parle sa langue. */
+  add_lexique?: string[];
 }
 
 export interface SessionAnalysis {
@@ -174,6 +183,7 @@ export interface ReminderConfig {
 export interface ExerciseReminder {
   id: string;
   exercise_description: string;
+  message?: string | null;
   frequency: string;
   start_date: string;
   end_date: string;

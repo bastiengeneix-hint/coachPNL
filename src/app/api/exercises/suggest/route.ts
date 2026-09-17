@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import Anthropic from '@anthropic-ai/sdk';
+import { ANALYSIS_MODEL } from '@/lib/ai/models';
+import { parseModelJson } from '@/lib/ai/json';
 
 function getAnthropic() {
   const key = process.env.INNER_COACH_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
@@ -47,7 +49,7 @@ export async function GET() {
       : '';
 
     const response = await getAnthropic().messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: ANALYSIS_MODEL,
       max_tokens: 400,
       system: `Tu es un assistant qui recommande des exercices de développement personnel.
 Les exercices disponibles sont :
@@ -78,12 +80,8 @@ Quels exercices recommandes-tu en priorité ?`,
       return NextResponse.json([]);
     }
 
-    try {
-      const suggestions = JSON.parse(textContent.text);
-      return NextResponse.json(Array.isArray(suggestions) ? suggestions : []);
-    } catch {
-      return NextResponse.json([]);
-    }
+    const suggestions = parseModelJson<unknown>(textContent.text);
+    return NextResponse.json(Array.isArray(suggestions) ? suggestions : []);
   } catch (error) {
     console.error('Exercise suggest error:', error);
     return NextResponse.json([]);

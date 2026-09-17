@@ -46,7 +46,9 @@ CREATE TABLE sessions (
   exercice_fait BOOLEAN NOT NULL DEFAULT false,
   summary TEXT,
   coach_summary TEXT,
-  actions JSONB NOT NULL DEFAULT '[]'
+  actions JSONB NOT NULL DEFAULT '[]',
+  -- false = séance en cours (reprenable), true = séance refermée et analysée.
+  ended BOOLEAN NOT NULL DEFAULT false
 );
 
 -- Active contexts table (one per user)
@@ -100,6 +102,7 @@ CREATE TABLE exercise_reminders (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
   exercise_description TEXT NOT NULL,
+  message TEXT,
   frequency TEXT NOT NULL,
   start_date DATE NOT NULL DEFAULT CURRENT_DATE,
   end_date DATE NOT NULL,
