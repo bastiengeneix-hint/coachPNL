@@ -12,7 +12,6 @@ import {
   saveSession,
   updateActiveContext,
   getRecentSessions,
-  evolveProfile,
   getProfile,
 } from '@/lib/memory/store';
 import type { SessionAnalysis } from '@/types';
@@ -148,7 +147,7 @@ function SessionContent() {
       const errorSession = addMessage(
         newSession,
         'coach',
-        `Désolée, je n'ai pas pu démarrer la session : ${errMsg}`
+        `Je n'ai pas pu démarrer la séance : ${errMsg}`
       );
       setSession(errorSession);
     } finally {
@@ -180,6 +179,9 @@ function SessionContent() {
           messages: formatMessagesForAPI(withUserMsg.messages),
           mode,
           isFirstMessage: false,
+          // Le coach a besoin de savoir depuis combien de temps la séance dure
+          // pour savoir s'il ouvre encore ou s'il doit faire atterrir.
+          startedAt: withUserMsg.messages[0]?.timestamp ?? null,
         }),
       });
 
@@ -205,7 +207,7 @@ function SessionContent() {
       const errorSession = addMessage(
         withUserMsg,
         'coach',
-        "Désolée, une erreur est survenue. Pouvez-vous reformuler ?"
+        "Il y a eu un problème de mon côté. Tu peux renvoyer ton message ?"
       );
       setSession(errorSession);
     } finally {
@@ -227,7 +229,7 @@ function SessionContent() {
       const analyzeRes = await fetch('/api/sessions/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: currentSession.messages }),
+        body: JSON.stringify({ messages: currentSession.messages, sessionId: currentSession.id }),
       });
 
       if (analyzeRes.ok) {
@@ -242,27 +244,9 @@ function SessionContent() {
           actions: analysis.actions || [],
         };
 
-        // Evolve profile based on session analysis (non-blocking)
-        evolveProfile(analysis.profile_evolution).catch((err) =>
-          console.warn('Profile evolution error (non-blocking):', err)
-        );
-
-        // Create exercise reminder if the coach proposed one with a schedule
-        if (analysis.exercice_propose && analysis.reminder_config) {
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + analysis.reminder_config.duration_days);
-          fetch('/api/reminders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              session_id: finalSession.id,
-              exercise_description: analysis.exercice_propose,
-              frequency: analysis.reminder_config.frequency,
-              end_date: endDate.toISOString(),
-              message: analysis.reminder_config.message,
-            }),
-          }).catch((err) => console.warn('Reminder creation error (non-blocking):', err));
-        }
+        // Le profil, le parcours et le rappel d'exercice sont écrits par la
+        // route d'analyse, côté serveur : plus rien à orchestrer ici, donc plus
+        // rien à perdre si l'onglet se ferme.
       }
     } catch (error) {
       console.warn('Session analysis error (non-blocking):', error);

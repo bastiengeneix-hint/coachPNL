@@ -76,12 +76,18 @@ export async function updateActiveContext(context: ActiveContext): Promise<void>
 // --- Profile Evolution ---
 
 export async function evolveProfile(evolution: ProfileEvolution): Promise<void> {
-  const hasChanges =
-    (evolution.add_croyances && evolution.add_croyances.length > 0) ||
-    (evolution.remove_croyances && evolution.remove_croyances.length > 0) ||
-    (evolution.add_patterns && evolution.add_patterns.length > 0) ||
-    (evolution.remove_patterns && evolution.remove_patterns.length > 0) ||
-    (evolution.add_projets && evolution.add_projets.length > 0);
+  const hasChanges = (
+    [
+      evolution.add_croyances,
+      evolution.remove_croyances,
+      evolution.add_patterns,
+      evolution.remove_patterns,
+      evolution.add_projets,
+      evolution.add_barrieres,
+      evolution.remove_barrieres,
+      evolution.add_lexique,
+    ] as (string[] | undefined)[]
+  ).some((list) => Array.isArray(list) && list.length > 0);
 
   if (!hasChanges) return;
 

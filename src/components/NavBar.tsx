@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 
 interface NavBarProps {
-  active: 'home' | 'exercices' | 'sessions' | 'settings';
+  active: 'home' | 'parcours' | 'exercices' | 'sessions' | 'settings';
 }
 
 const NAV_ICONS: Record<string, (active: boolean) => React.ReactNode> = {
@@ -11,6 +11,12 @@ const NAV_ICONS: Record<string, (active: boolean) => React.ReactNode> = {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  ),
+  parcours: (active) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 17l5-5 4 3 5-7 4 4" />
+      <path d="M3 21h18" />
     </svg>
   ),
   exercices: (active) => (
@@ -37,9 +43,10 @@ export default function NavBar({ active }: NavBarProps) {
   const router = useRouter();
 
   const items = [
-    { key: 'home' as const, label: 'Accueil', path: '/' },
+    { key: 'home' as const, label: 'Aujourd\u2019hui', path: '/' },
+    { key: 'parcours' as const, label: 'Parcours', path: '/parcours' },
     { key: 'exercices' as const, label: 'Exercices', path: '/exercices' },
-    { key: 'sessions' as const, label: 'Sessions', path: '/sessions' },
+    { key: 'sessions' as const, label: 'Séances', path: '/sessions' },
     { key: 'settings' as const, label: 'Réglages', path: '/settings' },
   ];
 

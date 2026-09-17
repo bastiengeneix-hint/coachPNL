@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { BilanContent, BilanType } from '@/types';
+import { ANALYSIS_MODEL } from '@/lib/ai/models';
+import { parseModelJson, stringArray } from '@/lib/ai/json';
 
 function getAnthropic() {
   return new Anthropic({
@@ -42,7 +44,25 @@ Règles :
 - coach_lesson : tirée des VRAIS échanges. Si les sessions sont légères, la leçon porte sur la présence ou la régularité.
 - next_action : EN LIEN DIRECT avec un sujet réellement abordé. Jamais d'action inventée sur un thème absent.
 
+Si un bloc « Son parcours » est fourni, il est PRIORITAIRE sur le reste :
+- Tu cites les chiffres exacts des mesures (« 4 → 6 »), jamais une appréciation floue à leur place.
+- Une pratique tenue se dit, une pratique lâchée se dit aussi — sans reproche, mais sans la passer sous silence.
+- profile_evolution parle d'abord de ce qui a bougé dans les mesures et les pratiques.
+- next_action sert l'objectif du parcours, et rien d'autre.
+
 Retourne UNIQUEMENT le JSON, sans commentaire ni markdown.`;
+
+/** L'état du parcours sur la période : c'est ça qui montre la progression. */
+export interface BilanSuivi {
+  objectif: string | null;
+  semaine: number | null;
+  total_semaines: number | null;
+  jalons: string[];
+  mesures: Array<{ label: string; debut: number | null; fin: number | null; cible: number | null; direction: 'up' | 'down' }>;
+  pratiques: Array<{ label: string; faites: number; attendues: number; serie: number }>;
+  protocoles: Array<{ nom: string; sujet: string | null; tient: boolean | null }>;
+  checkins: number;
+}
 
 interface SessionData {
   date: string;
@@ -60,7 +80,8 @@ export async function generateBilan(
   periodStart: string,
   periodEnd: string,
   sessions: SessionData[],
-  exercisesCount: number
+  exercisesCount: number,
+  suivi?: BilanSuivi | null
 ): Promise<BilanContent> {
   const periodLabel =
     type === 'weekly' ? 'semaine' :
@@ -91,18 +112,53 @@ export async function generateBilan(
   const totalActions = sessions.reduce((sum, s) => sum + (s.actions?.length || 0), 0);
   const doneActions = sessions.reduce((sum, s) => sum + (s.actions?.filter((a) => a.done).length || 0), 0);
 
+  // Les chiffres du suivi sont des FAITS : le modèle n'a pas à les deviner, et
+  // il n'a pas le droit de les contredire.
+  const suiviBlock = suivi
+    ? `## Son parcours (données réelles, non négociables)
+Objectif : ${suivi.objectif || 'aucun parcours défini'}${suivi.semaine ? ` — semaine ${suivi.semaine}${suivi.total_semaines ? `/${suivi.total_semaines}` : ''}` : ''}
+${suivi.jalons.length > 0 ? `Jalons : ${suivi.jalons.join(' · ')}` : 'Aucun jalon.'}
+${
+  suivi.mesures.length > 0
+    ? `Mesures sur la période :\n${suivi.mesures
+        .map(
+          (m) =>
+            `- « ${m.label} » : ${m.debut ?? '?'} → ${m.fin ?? '?'}${m.cible !== null ? ` (cible ${m.cible})` : ''} — ${m.direction === 'up' ? 'on veut que ça monte' : 'on veut que ça baisse'}`
+        )
+        .join('\n')}`
+    : 'Aucune mesure suivie.'
+}
+${
+  suivi.pratiques.length > 0
+    ? `Pratiques quotidiennes :\n${suivi.pratiques
+        .map((p) => `- « ${p.label} » : ${p.faites}/${p.attendues} sur la période, série actuelle ${p.serie}`)
+        .join('\n')}`
+    : 'Aucune pratique quotidienne.'
+}
+${
+  suivi.protocoles.length > 0
+    ? `Travaux conduits :\n${suivi.protocoles
+        .map((pr) => `- ${pr.nom}${pr.sujet ? ` sur « ${pr.sujet} »` : ''}${pr.tient === null ? '' : pr.tient ? ' — ça tient' : ' — pas encore réévalué'}`)
+        .join('\n')}`
+    : ''
+}
+Check-ins remplis : ${suivi.checkins}
+`
+    : '';
+
   const userMessage = `## Bilan ${periodLabel}
 Période : ${new Date(periodStart).toLocaleDateString('fr-FR')} — ${new Date(periodEnd).toLocaleDateString('fr-FR')}
 Nombre de sessions : ${sessions.length}
 Exercices faits : ${exercisesCount}
 Actions : ${doneActions}/${totalActions} complétées
 
+${suiviBlock}
 ## Sessions
 ${sessionsSummary || 'Aucune session sur cette période.'}`;
 
   try {
     const response = await getAnthropic().messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: ANALYSIS_MODEL,
       max_tokens: 1500,
       system: BILAN_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
@@ -111,24 +167,21 @@ ${sessionsSummary || 'Aucune session sur cette période.'}`;
     const textContent = response.content.find((block: { type: string }) => block.type === 'text') as { type: 'text'; text: string } | undefined;
     if (!textContent) return defaultBilanContent(sessions.length, exercisesCount, doneActions, totalActions);
 
-    // Strip markdown code blocks (```json...```) that Claude sometimes adds
-    let rawText = textContent.text.trim();
-    const fenceMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) rawText = fenceMatch[1].trim();
+    const parsed = parseModelJson<Record<string, unknown>>(textContent.text);
+    if (!parsed) return defaultBilanContent(sessions.length, exercisesCount, doneActions, totalActions);
 
-    const parsed = JSON.parse(rawText);
     return {
-      summary: parsed.summary || '',
-      themes_dominants: Array.isArray(parsed.themes_dominants) ? parsed.themes_dominants : [],
-      breakthroughs: Array.isArray(parsed.breakthroughs) ? parsed.breakthroughs : [],
+      summary: (parsed.summary as string) || '',
+      themes_dominants: stringArray(parsed.themes_dominants, 8),
+      breakthroughs: stringArray(parsed.breakthroughs, 8),
       actions_completed: typeof parsed.actions_completed === 'number' ? parsed.actions_completed : doneActions,
       actions_total: typeof parsed.actions_total === 'number' ? parsed.actions_total : totalActions,
       sessions_count: sessions.length,
       exercises_done: exercisesCount,
-      profile_evolution: parsed.profile_evolution || '',
-      coach_note: parsed.coach_note || '',
-      coach_lesson: parsed.coach_lesson || '',
-      next_action: parsed.next_action || '',
+      profile_evolution: (parsed.profile_evolution as string) || '',
+      coach_note: (parsed.coach_note as string) || '',
+      coach_lesson: (parsed.coach_lesson as string) || '',
+      next_action: (parsed.next_action as string) || '',
     };
   } catch (error) {
     console.error('Bilan generation error:', error);

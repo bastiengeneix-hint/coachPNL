@@ -97,6 +97,7 @@ export interface Database {
           summary: string | null;
           coach_summary: string | null;
           actions: Json;
+          ended: boolean;
         };
         Insert: {
           id?: string;
@@ -111,6 +112,7 @@ export interface Database {
           summary?: string | null;
           coach_summary?: string | null;
           actions?: Json;
+          ended?: boolean;
         };
         Update: {
           id?: string;
@@ -125,6 +127,7 @@ export interface Database {
           summary?: string | null;
           coach_summary?: string | null;
           actions?: Json;
+          ended?: boolean;
         };
         Relationships: [
           {
@@ -253,6 +256,7 @@ export interface Database {
           user_id: string;
           session_id: string | null;
           exercise_description: string;
+          message: string | null;
           frequency: string;
           start_date: string;
           end_date: string;
@@ -265,6 +269,7 @@ export interface Database {
           user_id: string;
           session_id?: string | null;
           exercise_description: string;
+          message: string | null;
           frequency: string;
           start_date?: string;
           end_date: string;
@@ -277,6 +282,7 @@ export interface Database {
           user_id?: string;
           session_id?: string | null;
           exercise_description?: string;
+          message?: string | null;
           frequency?: string;
           start_date?: string;
           end_date?: string;
@@ -408,6 +414,279 @@ export interface Database {
             referencedColumns: ['id'];
           },
         ];
+      };
+      programs: {
+        Row: {
+          id: string;
+          user_id: string;
+          objectif: string;
+          pourquoi_maintenant: string | null;
+          etat_present: string | null;
+          etat_desire: string | null;
+          criteres_reussite: string[];
+          echeance: string | null;
+          statut: string;
+          started_at: string;
+          closed_at: string | null;
+          bilan_final: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          objectif: string;
+          pourquoi_maintenant?: string | null;
+          etat_present?: string | null;
+          etat_desire?: string | null;
+          criteres_reussite?: string[];
+          echeance?: string | null;
+          statut?: string;
+          started_at?: string;
+          closed_at?: string | null;
+          bilan_final?: string | null;
+        };
+        Update: {
+          objectif?: string;
+          pourquoi_maintenant?: string | null;
+          etat_present?: string | null;
+          etat_desire?: string | null;
+          criteres_reussite?: string[];
+          echeance?: string | null;
+          statut?: string;
+          closed_at?: string | null;
+          bilan_final?: string | null;
+        };
+        Relationships: [];
+      };
+      program_milestones: {
+        Row: {
+          id: string;
+          program_id: string;
+          user_id: string;
+          label: string;
+          ordre: number;
+          target_date: string | null;
+          done: boolean;
+          done_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          program_id: string;
+          user_id: string;
+          label: string;
+          ordre?: number;
+          target_date?: string | null;
+          done?: boolean;
+          done_at?: string | null;
+        };
+        Update: {
+          label?: string;
+          ordre?: number;
+          target_date?: string | null;
+          done?: boolean;
+          done_at?: string | null;
+        };
+        Relationships: [];
+      };
+      measures: {
+        Row: {
+          id: string;
+          user_id: string;
+          program_id: string | null;
+          label: string;
+          question: string | null;
+          direction: string;
+          baseline: number | null;
+          cible: number | null;
+          cadence_days: number;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          program_id?: string | null;
+          label: string;
+          question?: string | null;
+          direction?: string;
+          baseline?: number | null;
+          cible?: number | null;
+          cadence_days?: number;
+          active?: boolean;
+        };
+        Update: {
+          label?: string;
+          question?: string | null;
+          direction?: string;
+          baseline?: number | null;
+          cible?: number | null;
+          cadence_days?: number;
+          active?: boolean;
+        };
+        Relationships: [];
+      };
+      measure_entries: {
+        Row: {
+          id: string;
+          measure_id: string;
+          user_id: string;
+          value: number;
+          note: string | null;
+          source: string;
+          recorded_at: string;
+        };
+        Insert: {
+          id?: string;
+          measure_id: string;
+          user_id: string;
+          value: number;
+          note?: string | null;
+          source?: string;
+          recorded_at?: string;
+        };
+        Update: {
+          value?: number;
+          note?: string | null;
+        };
+        Relationships: [];
+      };
+      practices: {
+        Row: {
+          id: string;
+          user_id: string;
+          program_id: string | null;
+          label: string;
+          pourquoi: string | null;
+          declencheur: string | null;
+          cadence: string;
+          target_per_week: number;
+          protocol_id: string | null;
+          active: boolean;
+          created_at: string;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          program_id?: string | null;
+          label: string;
+          pourquoi?: string | null;
+          declencheur?: string | null;
+          cadence?: string;
+          target_per_week?: number;
+          protocol_id?: string | null;
+          active?: boolean;
+        };
+        Update: {
+          label?: string;
+          pourquoi?: string | null;
+          declencheur?: string | null;
+          cadence?: string;
+          target_per_week?: number;
+          active?: boolean;
+          archived_at?: string | null;
+        };
+        Relationships: [];
+      };
+      practice_logs: {
+        Row: {
+          id: string;
+          practice_id: string;
+          user_id: string;
+          done_on: string;
+          done: boolean;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          practice_id: string;
+          user_id: string;
+          done_on?: string;
+          done?: boolean;
+          note?: string | null;
+        };
+        Update: {
+          done?: boolean;
+          note?: string | null;
+        };
+        Relationships: [];
+      };
+      protocol_runs: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_id: string | null;
+          protocol_id: string;
+          sujet: string | null;
+          resultat: string | null;
+          intensite_avant: number | null;
+          intensite_apres: number | null;
+          revisit_at: string | null;
+          revisited: boolean;
+          revisit_note: string | null;
+          ran_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          session_id?: string | null;
+          protocol_id: string;
+          sujet?: string | null;
+          resultat?: string | null;
+          intensite_avant?: number | null;
+          intensite_apres?: number | null;
+          revisit_at?: string | null;
+          revisited?: boolean;
+          revisit_note?: string | null;
+          ran_at?: string;
+        };
+        Update: {
+          resultat?: string | null;
+          intensite_apres?: number | null;
+          revisit_at?: string | null;
+          revisited?: boolean;
+          revisit_note?: string | null;
+        };
+        Relationships: [];
+      };
+      checkins: {
+        Row: {
+          id: string;
+          user_id: string;
+          day: string;
+          moment: string;
+          intention: string | null;
+          wins: string[];
+          frictions: string[];
+          energie: number | null;
+          note: string | null;
+          coach_reply: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          day?: string;
+          moment: string;
+          intention?: string | null;
+          wins?: string[];
+          frictions?: string[];
+          energie?: number | null;
+          note?: string | null;
+          coach_reply?: string | null;
+        };
+        Update: {
+          intention?: string | null;
+          wins?: string[];
+          frictions?: string[];
+          energie?: number | null;
+          note?: string | null;
+          coach_reply?: string | null;
+        };
+        Relationships: [];
       };
     };
     Views: {

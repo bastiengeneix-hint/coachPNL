@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import Anthropic from '@anthropic-ai/sdk';
+import { ANALYSIS_MODEL } from '@/lib/ai/models';
+import { parseModelJson } from '@/lib/ai/json';
 
 function getAnthropic() {
   const key = process.env.INNER_COACH_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
     const typeLabel = input_type === 'question' ? 'une question' : input_type === 'decision' ? 'une décision' : 'un souhait';
 
     const response = await getAnthropic().messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: ANALYSIS_MODEL,
       max_tokens: 1000,
       system: `Tu es un coach PNL expert en sciences cognitives. Tu utilises le modèle Système 1 / Système 2 de Daniel Kahneman pour analyser les pensées de ton client. Tu le tutoies.
 
@@ -81,20 +83,22 @@ ${profileBlock}${ragBlock}`,
       return NextResponse.json({ error: 'No response' }, { status: 500 });
     }
 
-    let raw = textContent.text.trim();
-    const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) raw = fenceMatch[1].trim();
+    const parsed = parseModelJson<Record<string, unknown>>(textContent.text);
+    if (!parsed) {
+      return NextResponse.json({ error: 'Réponse illisible du coach. Réessaye.' }, { status: 502 });
+    }
 
-    const parsed = JSON.parse(raw);
+    const evo = (parsed.profile_evolution || {}) as Record<string, string[]>;
+
     return NextResponse.json({
-      systeme1: parsed.systeme1 || '',
-      systeme2: parsed.systeme2 || '',
-      conclusion: parsed.conclusion || '',
+      systeme1: (parsed.systeme1 as string) || '',
+      systeme2: (parsed.systeme2 as string) || '',
+      conclusion: (parsed.conclusion as string) || '',
       profile_evolution: {
-        add_croyances: parsed.profile_evolution?.add_croyances || [],
-        remove_croyances: parsed.profile_evolution?.remove_croyances || [],
-        add_patterns: parsed.profile_evolution?.add_patterns || [],
-        remove_patterns: parsed.profile_evolution?.remove_patterns || [],
+        add_croyances: evo.add_croyances || [],
+        remove_croyances: evo.remove_croyances || [],
+        add_patterns: evo.add_patterns || [],
+        remove_patterns: evo.remove_patterns || [],
       },
     });
   } catch (error) {

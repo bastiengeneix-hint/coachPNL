@@ -90,17 +90,34 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { id, completed } = await req.json();
+    const isDone = completed ?? true;
 
     const supabase = createServerClient();
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('exercise_reminders')
-      .update({ completed: completed ?? true })
+      .update({ completed: isDone })
       .eq('id', id)
-      .eq('user_id', session.user.id);
+      .eq('user_id', session.user.id)
+      .select('session_id')
+      .single();
 
     if (error) {
       console.error('Error updating reminder:', error);
       return NextResponse.json({ error: 'Failed to update reminder' }, { status: 500 });
+    }
+
+    // Solder l'exercice côté séance : sans ça `exercice_fait` restait false pour
+    // toujours et le coach relançait un exercice déjà fait.
+    if (isDone && updated?.session_id) {
+      const { error: sessionError } = await supabase
+        .from('sessions')
+        .update({ exercice_fait: true })
+        .eq('id', updated.session_id)
+        .eq('user_id', session.user.id);
+
+      if (sessionError) {
+        console.warn('Reminder done but session not updated:', sessionError);
+      }
     }
 
     return NextResponse.json({ success: true });
