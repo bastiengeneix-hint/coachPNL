@@ -5,6 +5,10 @@
       "schedule": "0 */2 * * *"
     },
     {
+      "path": "/api/bilans/generate?type=weekly",
+      "schedule": "0 6 * * 1"
+    },
+    {
       "path": "/api/bilans/generate",
       "schedule": "0 8 1 * *"
     }

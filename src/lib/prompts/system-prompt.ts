@@ -3,6 +3,8 @@ import { CoachingStrategy } from './strategy-agent';
 import { getProtocol, buildProtocolBlock } from '@/lib/pnl/protocols';
 import { buildSafetyBlock } from '@/lib/coach/safety';
 import { buildArcBlock, type SessionArc } from '@/lib/coach/session-arc';
+import { buildProgramBlock } from './program-block';
+import type { CoachingSnapshot } from '@/types';
 
 interface RAGPassage {
   livre: string;
@@ -224,42 +226,6 @@ function buildContextBlock(ctx: ActiveContext): string {
   return parts.join('\n');
 }
 
-// ─── BLOC ENGAGEMENTS ───────────────────────────────────────────────────────
-// Avant, les actions non faites dormaient dans l'historique sans consigne :
-// le coach ne relançait jamais. Un coach qui ne demande pas de comptes ne sert à rien.
-
-function buildEngagementsBlock(params: {
-  userName: string;
-  pendingActions: string[];
-  pendingExercice: string | null;
-  followUp: string | null;
-}): string {
-  if (params.pendingActions.length === 0 && !params.pendingExercice) return '';
-
-  const parts: string[] = ['## Engagements en cours'];
-
-  if (params.pendingActions.length > 0) {
-    parts.push(params.pendingActions.map((a) => `- ${a}`).join('\n'));
-  }
-  if (params.pendingExercice) {
-    parts.push(`- Exercice proposé, pas encore fait : ${params.pendingExercice}`);
-  }
-
-  if (params.followUp) {
-    parts.push(
-      '',
-      `À REPRENDRE MAINTENANT : « ${params.followUp} ». Tu demandes où ça en est, simplement, sans culpabiliser et sans faire l'inspecteur. Si ce n'est pas fait, ce qui a empêché de le faire est plus intéressant que l'action elle-même.`
-    );
-  } else {
-    parts.push(
-      '',
-      "Tu les as en tête. Tu ne les ressors PAS dans ce message si le moment ne s'y prête pas — mais tu n'es pas amnésique non plus."
-    );
-  }
-
-  return parts.join('\n');
-}
-
 // ─── BLOC RAG ───────────────────────────────────────────────────────────────
 
 function buildRAGBlock(passages: RAGPassage[], userName: string): string {
@@ -419,7 +385,7 @@ Ce sont de vrais échanges. Fais des liens naturels. N'invente jamais un détail
 
 // ─── BLOC STRATÉGIE (dynamique — vient du superviseur) ──────────────────────
 
-function buildStrategyBlock(userName: string, strategy: CoachingStrategy): string {
+function buildStrategyBlock(userName: string, strategy: CoachingStrategy, agenda: string[] = []): string {
   const moveDescriptions: Record<string, string> = {
     mirror: `MIROIR ÉMOTIONNEL — Nomme l'émotion que tu détectes : "${strategy.user_emotion}".${
       strategy.subtext ? ` Ce qui se dit sous les mots : "${strategy.subtext}".` : ''
@@ -436,6 +402,8 @@ function buildStrategyBlock(userName: string, strategy: CoachingStrategy): strin
     teach: `ENSEIGNEMENT — C'est le moment de transmettre : un concept, une mécanique, une leçon. Pas un cours magistral — une conversation où tu donnes quelque chose de précieux, avec un exemple concret. Tu peux aller en profondeur.`,
     protocol: `PROTOCOLE — Tu conduis le protocole décrit juste au-dessus, à l'étape indiquée. Une étape, une seule. Tu ne le nommes pas, tu ne l'annonces pas.`,
     exercise: `EXERCICE — Tu proposes un exercice concret à faire maintenant ou dans les jours qui viennent. Précis dans les étapes, court à l'énoncé. Si c'est l'un des quatre exercices de l'app, colle son marqueur.`,
+    accountability: `DEMANDER DES COMPTES — Tu reprends ce qui est dû dans le suivi (un relevé, un engagement, une pratique décrochée, un protocole à réévaluer). Direct, court, sans détour et sans reproche : tu demandes, tu écoutes, et ce qui a empêché t'intéresse plus que l'excuse. C'est le geste que personne d'autre ne fait pour ${userName}.`,
+    program_setup: `POSER LE PARCOURS — Tu fais formuler ce qu'on cherche à obtenir sur les prochaines semaines : au positif, vérifiable, sous son contrôle. Tu conduis ça comme un protocole (une étape à la fois), tu ne remplis pas un formulaire. Une seule question dans ce message.`,
   };
 
   const lengthInstructions: Record<string, string> = {
@@ -467,6 +435,14 @@ function buildStrategyBlock(userName: string, strategy: CoachingStrategy): strin
         : 'AUCUNE question dans ce message. Tu observes, tu nommes, tu confrontes, tu transmets. Une affirmation bien posée travaille plus qu\'une question de plus.'
     }`,
   ];
+
+  // Le point de suivi choisi par le superviseur passe avant le reste du détail :
+  // c'est lui qui transforme une conversation en accompagnement.
+  const agendaItem =
+    strategy.agenda_item && agenda[strategy.agenda_item - 1] ? agenda[strategy.agenda_item - 1] : null;
+  if (agendaItem) {
+    parts.push('', `**POINT DE SUIVI À TRAITER DANS CE MESSAGE** : ${agendaItem}`);
+  }
 
   if (strategy.session_goal) {
     parts.push('', `**L'objectif de la séance** : ${strategy.session_goal}. Garde le cap là-dessus.`);
@@ -518,7 +494,10 @@ export interface BuildPromptParams {
   recentSessions?: RecentSession[];
   strategy?: CoachingStrategy;
   arc?: SessionArc;
-  pendingActions?: string[];
+  /** L'état du suivi : parcours, mesures, pratiques, protocoles à réévaluer. */
+  snapshot?: CoachingSnapshot | null;
+  /** Ordre du jour calculé à partir du snapshot (évite de le recalculer). */
+  agenda?: string[];
   sessionsTotal?: number;
   firstSessionDate?: string | null;
 }
@@ -554,19 +533,22 @@ export function buildSystemPromptParts(params: BuildPromptParams): { stable: str
     }),
     buildProfileBlock(params.userName, params.profile),
     buildContextBlock(params.activeContext),
-    buildEngagementsBlock({
-      userName: params.userName,
-      pendingActions: params.pendingActions || [],
-      pendingExercice: params.activeContext.pending_exercice,
-      followUp: params.strategy?.follow_up || null,
-    }),
+    params.snapshot
+      ? buildProgramBlock({
+          userName: params.userName,
+          snapshot: params.snapshot,
+          followUp: params.strategy?.follow_up || null,
+          pendingExercice: params.activeContext.pending_exercice,
+          agenda: params.agenda,
+        })
+      : '',
     buildConversationHistoryBlock(params.userName, params.recentSessions || []),
     buildExerciseResultsBlock(params.userName, params.exerciseResults || []),
     buildRAGBlock(params.ragPassages, params.userName),
     buildModeBlock(params.mode, params.isFirstMessage, params.userName),
     params.arc ? buildArcBlock(params.arc) : '',
     protocol ? buildProtocolBlock(protocol, params.strategy?.protocol_step ?? 1) : '',
-    params.strategy ? buildStrategyBlock(params.userName, params.strategy) : '',
+    params.strategy ? buildStrategyBlock(params.userName, params.strategy, params.agenda || []) : '',
     // Le filet de sécurité passe en dernier : c'est la dernière chose que le modèle lit.
     params.strategy ? buildSafetyBlock(params.strategy.risk, params.userName) : '',
   ]

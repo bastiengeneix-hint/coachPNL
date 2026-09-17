@@ -1,93 +1,17 @@
--- Inner Coach v2 - Supabase Schema
--- Run this SQL in the Supabase SQL editor
+-- ============================================================
+-- INNER COACH — MIGRATION UNIQUE, IDEMPOTENTE
+-- À coller dans le SQL Editor de Supabase. Peut être rejouée sans risque.
+-- Remplace src/migration-add-missing-tables.sql (contenu inclus ci-dessous).
+-- ============================================================
 
--- Enable pgvector extension for embeddings
-CREATE EXTENSION IF NOT EXISTS vector;
+-- ─── 1. RATTRAPAGES (colonnes/tables écrites par l'app, jamais créées) ──────
 
--- ============================================
--- TABLES
--- ============================================
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS coach_summary TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS actions JSONB NOT NULL DEFAULT '[]';
+-- Sans `ended`, AUCUNE séance ne peut être sauvegardée (l'app l'écrit à chaque message).
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended BOOLEAN NOT NULL DEFAULT false;
 
--- Users table
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL,
-  name TEXT,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
-  onboarding_complete BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Profiles table
-CREATE TABLE profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  projets TEXT[] NOT NULL DEFAULT '{}',
-  patterns_sabotage TEXT[] NOT NULL DEFAULT '{}',
-  barrieres_ulp TEXT[] NOT NULL DEFAULT '{}',
-  croyances_limitantes TEXT[] NOT NULL DEFAULT '{}',
-  preferences JSONB NOT NULL DEFAULT '{"ce_qui_aide": [], "ce_qui_bloque": [], "ton": "mix"}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT profiles_user_id_unique UNIQUE (user_id)
-);
-
--- Sessions table
-CREATE TABLE sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  date TIMESTAMPTZ NOT NULL DEFAULT now(),
-  mode TEXT NOT NULL CHECK (mode IN ('deblocage', 'journal')),
-  messages JSONB NOT NULL DEFAULT '[]',
-  insights JSONB NOT NULL DEFAULT '[]',
-  themes TEXT[] NOT NULL DEFAULT '{}',
-  exercice_propose TEXT,
-  exercice_fait BOOLEAN NOT NULL DEFAULT false,
-  summary TEXT,
-  coach_summary TEXT,
-  actions JSONB NOT NULL DEFAULT '[]',
-  -- false = séance en cours (reprenable), true = séance refermée et analysée.
-  ended BOOLEAN NOT NULL DEFAULT false
-);
-
--- Active contexts table (one per user)
-CREATE TABLE active_contexts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  summary TEXT NOT NULL DEFAULT '',
-  last_updated TIMESTAMPTZ NOT NULL DEFAULT now(),
-  recent_themes TEXT[] NOT NULL DEFAULT '{}',
-  pending_exercice TEXT,
-  CONSTRAINT active_contexts_user_id_unique UNIQUE (user_id)
-);
-
--- Sources table (RAG knowledge base books/documents)
-CREATE TABLE sources (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  titre TEXT NOT NULL,
-  auteur TEXT NOT NULL,
-  domaine TEXT NOT NULL,
-  active BOOLEAN NOT NULL DEFAULT true,
-  uploaded_by UUID NOT NULL REFERENCES users(id),
-  chunks_count INTEGER NOT NULL DEFAULT 0,
-  indexed_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Chunks table (RAG document chunks with embeddings)
-CREATE TABLE chunks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source_id UUID NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  page_start INTEGER,
-  page_end INTEGER,
-  chapitre TEXT,
-  embedding vector(1536) NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Exercise results table
-CREATE TABLE exercise_results (
+CREATE TABLE IF NOT EXISTS exercise_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   exercise_type TEXT NOT NULL,
@@ -96,13 +20,11 @@ CREATE TABLE exercise_results (
   completed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Exercise reminders table
-CREATE TABLE exercise_reminders (
+CREATE TABLE IF NOT EXISTS exercise_reminders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
   exercise_description TEXT NOT NULL,
-  message TEXT,
   frequency TEXT NOT NULL,
   start_date DATE NOT NULL DEFAULT CURRENT_DATE,
   end_date DATE NOT NULL,
@@ -110,17 +32,17 @@ CREATE TABLE exercise_reminders (
   completed BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- L'API écrivait `message`, la colonne n'existait pas : aucun rappel n'a jamais pu être créé.
+ALTER TABLE exercise_reminders ADD COLUMN IF NOT EXISTS message TEXT;
 
--- Push subscriptions table
-CREATE TABLE push_subscriptions (
+CREATE TABLE IF NOT EXISTS push_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   subscription JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Bilans table (weekly/monthly/yearly reviews)
-CREATE TABLE bilans (
+CREATE TABLE IF NOT EXISTS bilans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('weekly', 'monthly', 'yearly')),
@@ -129,93 +51,6 @@ CREATE TABLE bilans (
   content JSONB NOT NULL DEFAULT '{}',
   generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- ============================================
--- INDEXES
--- ============================================
-
--- Sessions: lookup by user and date
-CREATE INDEX idx_sessions_user_date ON sessions(user_id, date DESC);
-
--- Chunks: lookup by source
-CREATE INDEX idx_chunks_source ON chunks(source_id);
-
--- Chunks: HNSW index for fast vector similarity search
-CREATE INDEX idx_chunks_embedding ON chunks
-  USING hnsw (embedding vector_cosine_ops)
-  WITH (m = 16, ef_construction = 64);
-
--- Users: email lookup
-CREATE INDEX idx_users_email ON users(email);
-
--- Exercise results: lookup by user
-CREATE INDEX idx_exercise_results_user ON exercise_results(user_id, completed_at DESC);
-
--- Exercise reminders: lookup for pending reminders
-CREATE INDEX idx_exercise_reminders_next ON exercise_reminders(user_id, next_reminder_at)
-  WHERE completed = false;
-
--- Bilans: lookup by user and period
-CREATE INDEX idx_bilans_user_period ON bilans(user_id, period_start DESC);
-
--- ============================================
--- FUNCTIONS
--- ============================================
-
--- match_chunks: RPC function for vector similarity search
-CREATE OR REPLACE FUNCTION match_chunks(
-  query_embedding vector(1536),
-  match_threshold FLOAT DEFAULT 0.7,
-  match_count INT DEFAULT 5
-)
-RETURNS TABLE (
-  id UUID,
-  source_id UUID,
-  content TEXT,
-  page_start INTEGER,
-  page_end INTEGER,
-  chapitre TEXT,
-  similarity FLOAT
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    c.id,
-    c.source_id,
-    c.content,
-    c.page_start,
-    c.page_end,
-    c.chapitre,
-    1 - (c.embedding <=> query_embedding) AS similarity
-  FROM chunks c
-  INNER JOIN sources s ON s.id = c.source_id
-  WHERE s.active = true
-    AND 1 - (c.embedding <=> query_embedding) > match_threshold
-  ORDER BY c.embedding <=> query_embedding
-  LIMIT match_count;
-END;
-$$;
-
--- Auto-update updated_at on profiles
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER profiles_updated_at
-  BEFORE UPDATE ON profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
-
--- ============================================
--- LE SUIVI (parcours, mesures, pratiques, protocoles, check-ins)
--- Voir README « Le parcours ». Le meme DDL est rejouable via src/migration.sql.
--- ============================================
 
 -- ─── 2. LE PARCOURS — la colonne vertébrale du suivi ────────────────────────
 -- Un parcours actif par utilisateur : l'objectif bien formulé, l'état présent,
@@ -366,18 +201,33 @@ CREATE TABLE IF NOT EXISTS checkins (
 
 CREATE INDEX IF NOT EXISTS idx_checkins_user ON checkins(user_id, day DESC);
 
--- ============================================
--- RLS — PARCOURS
--- ============================================
+-- ─── 7. RLS ─────────────────────────────────────────────────────────────────
+-- Même régime que les tables existantes : RLS activée, aucun accès anon.
+-- L'app lit et écrit exclusivement côté serveur avec la service_role, après
+-- avoir vérifié la session NextAuth.
 
-ALTER TABLE programs           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE program_milestones ENABLE ROW LEVEL SECURITY;
-ALTER TABLE measures           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE measure_entries    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE practices          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE practice_logs      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE protocol_runs      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE checkins           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE programs             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE program_milestones   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE measures             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE measure_entries      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE practices            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE practice_logs        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE protocol_runs        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checkins             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exercise_results     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exercise_reminders   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_subscriptions   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bilans               ENABLE ROW LEVEL SECURITY;
+
+-- ─── 8. updated_at sur programs ─────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS programs_updated_at ON programs;
 CREATE TRIGGER programs_updated_at

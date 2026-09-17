@@ -8,6 +8,8 @@ import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { COACH_MODEL } from '@/lib/ai/models';
 import { computeSessionArc } from '@/lib/coach/session-arc';
+import { getCoachingSnapshot } from '@/lib/program/snapshot';
+import { buildFollowUpAgenda, buildSnapshotBriefing } from '@/lib/prompts/program-block';
 import { SessionMode, Profile, ActiveContext, ExerciseResult } from '@/types';
 
 function getAnthropicKey(): string {
@@ -121,18 +123,14 @@ export async function POST(req: NextRequest) {
       .order('date', { ascending: true })
       .limit(1);
 
-    // 6d. Engagements non soldés : c'est ce qui permet au coach de demander des comptes.
-    const pendingActions: string[] = [];
-    for (const s of (recentSessions || []) as unknown as Array<{ date: string; actions?: Array<{ text: string; done: boolean }> }>) {
-      const actions = Array.isArray(s.actions) ? s.actions : [];
-      for (const a of actions) {
-        if (!a.done && a.text && pendingActions.length < 5) {
-          const daysAgo = Math.round((Date.now() - new Date(s.date).getTime()) / 86400000);
-          const when = daysAgo === 0 ? "aujourd'hui" : daysAgo === 1 ? 'hier' : `il y a ${daysAgo} jours`;
-          pendingActions.push(`${a.text} (pris ${when})`);
-        }
-      }
-    }
+    // 6d. LE SUIVI — parcours, mesures, pratiques, protocoles à réévaluer,
+    // check-ins, engagements non soldés. Une seule lecture, partagée par le
+    // superviseur et le prompt du coach : ils travaillent sur la même vérité.
+    const snapshot = await getCoachingSnapshot(supabase, session.user.id);
+    const agenda = buildFollowUpAgenda(snapshot);
+    const pendingActions = snapshot.pendingActions.map(
+      (a) => `${a.text} (pris il y a ${a.days_ago} j)`
+    );
 
     // 7. Fetch recent exercise results
     const { data: exerciseResults } = await supabase
@@ -187,10 +185,12 @@ export async function POST(req: NextRequest) {
           shouldLand: arc.shouldLand,
           exchangeCount: arc.exchangeCount,
           elapsedMinutes: arc.elapsedMinutes,
+          snapshotBriefing: buildSnapshotBriefing(snapshot),
+          agenda,
         });
 
     console.log(
-      `Coach strategy: phase=${arc.phase} move=${strategy.move} protocol=${strategy.protocol ?? 'none'}:${strategy.protocol_step} len=${strategy.length} tone=${strategy.tone} q=${strategy.should_ask_question} intensity=${strategy.emotion_intensity} risk=${strategy.risk} book=${strategy.book_concept ? 'yes' : 'no'} avoid=${strategy.avoid.length}`
+      `Coach strategy: phase=${arc.phase} move=${strategy.move} protocol=${strategy.protocol ?? 'none'}:${strategy.protocol_step} len=${strategy.length} tone=${strategy.tone} q=${strategy.should_ask_question} intensity=${strategy.emotion_intensity} risk=${strategy.risk} agenda=${strategy.agenda_item ?? '-'}/${agenda.length} book=${strategy.book_concept ? 'yes' : 'no'} avoid=${strategy.avoid.length}`
     );
 
     // ─── 11. PROMPT SYSTÈME ────────────────────────────────────────────────
@@ -215,7 +215,8 @@ export async function POST(req: NextRequest) {
       }>,
       strategy,
       arc,
-      pendingActions,
+      snapshot,
+      agenda,
       sessionsTotal: sessionsTotal ?? 0,
       firstSessionDate: firstSessionRow?.[0]?.date ?? null,
     });
@@ -269,6 +270,8 @@ export async function POST(req: NextRequest) {
         protocol: strategy.protocol,
         protocol_step: strategy.protocol_step,
         risk: strategy.risk,
+        agenda_item: strategy.agenda_item,
+        has_program: snapshot.program !== null,
       },
     });
   } catch (error) {

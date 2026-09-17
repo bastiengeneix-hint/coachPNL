@@ -172,6 +172,53 @@ export interface SessionAnalysis {
   profile_evolution: ProfileEvolution;
 }
 
+/**
+ * Ce qu'on récolte d'une séance pour faire avancer le PARCOURS (et pas
+ * seulement pour en garder un résumé). Extrait par un appel dédié en fin de
+ * séance, appliqué côté serveur.
+ */
+export interface SessionHarvest {
+  program: {
+    /** Objectif bien formulé, au positif, dans ses mots. */
+    objectif: string | null;
+    pourquoi_maintenant: string | null;
+    etat_present: string | null;
+    etat_desire: string | null;
+    criteres_reussite: string[];
+    /** Nombre de semaines de travail visé (converti en date côté serveur). */
+    duree_semaines: number | null;
+    /** true seulement si la séance a explicitement redéfini l'objectif. */
+    revise_objectif: boolean;
+  } | null;
+  milestones_new: string[];
+  milestones_done: string[];
+  measures_new: Array<{
+    label: string;
+    question: string;
+    direction: 'up' | 'down';
+    baseline: number | null;
+    cible: number | null;
+  }>;
+  measure_readings: Array<{ label: string; value: number; note: string | null }>;
+  practices_new: Array<{
+    label: string;
+    pourquoi: string | null;
+    declencheur: string | null;
+    cadence: PracticeCadence;
+    protocol_id: string | null;
+  }>;
+  protocol_run: {
+    protocol_id: string;
+    sujet: string | null;
+    resultat: string | null;
+    intensite_avant: number | null;
+    intensite_apres: number | null;
+    revisit_in_days: number | null;
+  } | null;
+  /** Protocoles anciens réévalués pendant cette séance (ids). */
+  protocols_revisited: Array<{ protocol_id: string; note: string | null }>;
+}
+
 // --- Reminder types ---
 
 export interface ReminderConfig {
@@ -216,4 +263,170 @@ export interface Bilan {
   period_end: string;
   content: BilanContent;
   generated_at: string;
+}
+
+// ─── LE PARCOURS ────────────────────────────────────────────────────────────
+// Un coach qui vaut son prix ne fait pas des séances : il conduit un travail.
+// Un objectif bien formulé, des mesures, des pratiques quotidiennes, des
+// protocoles qu'on réévalue. Tout ce qui suit est cette colonne vertébrale.
+
+export type ProgramStatus = 'actif' | 'atteint' | 'abandonne' | 'en_pause';
+
+export interface Program {
+  id: string;
+  objectif: string;
+  pourquoi_maintenant: string | null;
+  etat_present: string | null;
+  etat_desire: string | null;
+  criteres_reussite: string[];
+  echeance: string | null;
+  statut: ProgramStatus;
+  started_at: string;
+  closed_at: string | null;
+  bilan_final: string | null;
+}
+
+export interface ProgramMilestone {
+  id: string;
+  program_id: string;
+  label: string;
+  ordre: number;
+  target_date: string | null;
+  done: boolean;
+  done_at: string | null;
+}
+
+export interface Measure {
+  id: string;
+  program_id: string | null;
+  label: string;
+  question: string | null;
+  /** 'up' = on veut que ça monte (confiance), 'down' = qu'on veut voir baisser (anxiété). */
+  direction: 'up' | 'down';
+  baseline: number | null;
+  cible: number | null;
+  cadence_days: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface MeasureEntry {
+  id: string;
+  measure_id: string;
+  value: number;
+  note: string | null;
+  source: 'app' | 'session' | 'checkin';
+  recorded_at: string;
+}
+
+/** Une mesure avec son historique et ce qu'on en déduit. */
+export interface MeasureWithHistory extends Measure {
+  entries: MeasureEntry[];
+  last: MeasureEntry | null;
+  /** Écart avec le relevé d'il y a ~2 semaines. null si pas assez de données. */
+  delta: number | null;
+  /** true si le prochain relevé est dû (cadence dépassée). */
+  due: boolean;
+}
+
+export type PracticeCadence = 'daily' | 'weekdays' | 'weekly';
+
+export interface Practice {
+  id: string;
+  program_id: string | null;
+  label: string;
+  pourquoi: string | null;
+  declencheur: string | null;
+  cadence: PracticeCadence;
+  target_per_week: number;
+  /** Protocole PNL dont la pratique découle, si elle vient d'une séance. */
+  protocol_id: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface PracticeLog {
+  id: string;
+  practice_id: string;
+  done_on: string;
+  done: boolean;
+  note: string | null;
+}
+
+/** Une pratique avec sa série et son état du jour. */
+export interface PracticeWithProgress extends Practice {
+  done_today: boolean;
+  /** Jours consécutifs (en ne comptant que les jours attendus). */
+  streak: number;
+  /** Nombre de fois faite sur les 7 derniers jours. */
+  last_7: number;
+  /** true si elle est due aujourd'hui et pas encore cochée. */
+  due_today: boolean;
+  /** true si elle a décroché : attendue mais pas faite depuis 3 jours ou plus. */
+  slipping: boolean;
+  logs: PracticeLog[];
+}
+
+export interface ProtocolRun {
+  id: string;
+  session_id: string | null;
+  protocol_id: string;
+  sujet: string | null;
+  resultat: string | null;
+  intensite_avant: number | null;
+  intensite_apres: number | null;
+  revisit_at: string | null;
+  revisited: boolean;
+  revisit_note: string | null;
+  ran_at: string;
+}
+
+export type CheckinMoment = 'matin' | 'soir';
+
+export interface Checkin {
+  id: string;
+  day: string;
+  moment: CheckinMoment;
+  intention: string | null;
+  wins: string[];
+  frictions: string[];
+  energie: number | null;
+  note: string | null;
+  coach_reply: string | null;
+  created_at: string;
+}
+
+/**
+ * L'état du suivi à un instant donné. Une seule lecture, utilisée par
+ * l'accueil, la page parcours, le superviseur ET le prompt du coach — pour que
+ * tout le monde travaille sur la même vérité.
+ */
+export interface CoachingSnapshot {
+  program: Program | null;
+  milestones: ProgramMilestone[];
+  measures: MeasureWithHistory[];
+  practices: PracticeWithProgress[];
+  /** Protocoles dont la réévaluation est due. */
+  protocolsToRevisit: ProtocolRun[];
+  recentRuns: ProtocolRun[];
+  checkinToday: { matin: Checkin | null; soir: Checkin | null };
+  recentCheckins: Checkin[];
+  /** Actions non soldées, extraites des séances récentes. */
+  pendingActions: Array<{ text: string; days_ago: number }>;
+  derived: {
+    /** Semaine en cours du parcours (1-indexée). */
+    week: number | null;
+    /** Nombre de semaines prévu jusqu'à l'échéance. */
+    totalWeeks: number | null;
+    milestonesDone: number;
+    milestonesTotal: number;
+    /** Pratiques dues aujourd'hui et pas encore faites. */
+    practicesDueToday: number;
+    /** Mesures dont le relevé est dû. */
+    measuresDue: number;
+    /** Jours consécutifs avec au moins un check-in. */
+    checkinStreak: number;
+    /** Dernière séance, en jours. null si aucune. */
+    daysSinceLastSession: number | null;
+  };
 }

@@ -21,10 +21,11 @@ Ouvrir [http://localhost:3000](http://localhost:3000).
 2. Executer `src/supabase-schema.sql` dans le SQL Editor
 3. Copier les cles dans `.env`
 
-**Base deja creee ?** Executer `src/migration-add-missing-tables.sql` : il est idempotent et
-rattrape les colonnes ajoutees apres coup (`sessions.ended`, `exercise_reminders.message`).
-Sans `sessions.ended`, aucune seance ne peut etre sauvegardee ; sans `exercise_reminders.message`,
-aucun rappel d'exercice ne peut etre cree.
+**Base deja creee ?** Executer `src/migration.sql` : un seul fichier, idempotent, rejouable.
+Il rattrape les colonnes ecrites par l'app mais creees par aucun SQL (`sessions.ended`,
+`exercise_reminders.message`) et pose les tables du suivi (parcours, mesures, pratiques,
+protocoles, check-ins). Sans `sessions.ended`, aucune seance ne peut etre sauvegardee ; sans
+`exercise_reminders.message`, aucun rappel d'exercice ne peut etre cree.
 
 ## Architecture
 
@@ -61,11 +62,17 @@ src/
     supabase/             # Clients + types Supabase
     memory/               # Store async (API calls) + evolution du profil
     pnl/                  # Bibliotheque de protocoles PNL (15 protocoles, etape par etape)
+    program/              # Le suivi : snapshot (lecture unique) + recolte de fin de seance
     prompts/              # Prompt systeme (bloc stable + bloc contextuel) + superviseur
     coach/                # Arc de seance, filet de securite, analyse de seance
     rag/                  # Pipeline RAG (ingest PDF + retrieve vectoriel)
   types/                  # Types TypeScript
 ```
+
+Pages du suivi : `(app)/page.tsx` (tableau de bord du jour), `(app)/parcours/` (objectif,
+courbes, pratiques, travaux conduits), `(app)/checkin/` (le rituel de 60 secondes).
+Routes : `api/snapshot`, `api/program`, `api/practices`, `api/measures`, `api/checkins`,
+`api/protocols/revisit`.
 
 ## Le coach
 
@@ -104,10 +111,47 @@ Le coach peut aussi proposer un exercice de l'app en collant un marqueur `[[exer
 dans son message : `components/CoachMessage.tsx` le transforme en bouton et le retire du texte lu
 par la synthese vocale.
 
+## Le parcours — ce qui fait la difference entre une conversation et un accompagnement
+
+Un coach qui vaut son prix ne fait pas des seances : il conduit un travail, sur plusieurs
+semaines, avec des reperes mesurables et des comptes a rendre. C'est ce que porte
+`lib/program/`.
+
+**Une colonne vertebrale.** Un parcours actif par personne : un objectif bien formule (au
+positif, verifiable, sous son controle), l'etat de depart, l'etat vise, des jalons, une
+echeance. Mesures, pratiques et protocoles s'accrochent dessus. Le coach le pose lui-meme en
+seance (protocole `objectif_bien_forme`) ; la page `/parcours` permet aussi de l'ecrire a la main.
+
+**Des mesures.** 2 a 4 ressentis notes de 0 a 10, nommes AVEC SES MOTS, avec la question exacte
+que le coach reposera. Releves en seance, depuis l'accueil ou apres un check-in. C'est ce qui
+permet de dire « il y a trois semaines t'etais a 3, t'es a 6 » — et de le montrer en courbe.
+
+**Des pratiques quotidiennes.** 1 a 3 micro-actions de moins de 5 minutes, avec un declencheur
+concret, cochees depuis l'accueil. Serie, assiduite sur 7 jours, detection du decrochage. Un
+ancrage PNL se consolide par repetition, pas par une seance.
+
+**Des protocoles reevalues.** Chaque protocole conduit est enregistre avec son sujet, l'intensite
+avant/apres et une date de reevaluation. Passe cette date, le coach REVIENT dessus : « ton ancre,
+tu t'en es servi ? ca tient ? ». C'est la doctrine PNL (tester, pont vers le futur, reevaluer),
+et c'est ce qui fait que le travail tient.
+
+**Un check-in de 60 secondes.** Le matin une intention, le soir ce qui a marche et ce qui a
+coince, plus l'energie. Le coach repond en une phrase. C'est le fil entre deux seances.
+
+**Un ordre du jour calcule.** `buildFollowUpAgenda()` produit, sans modele, la liste priorisee de
+ce qui est du : reevaluer un protocole, relever une mesure, reprendre une pratique decrochee,
+solder un engagement, poser le parcours s'il manque. Le superviseur choisit QUAND le coach le
+traite (un point par message, jamais au-dessus d'une emotion forte), mais rien ne disparait.
+
+**Une recolte de fin de seance.** `lib/program/harvest.ts` relit la seance et en tire l'objectif,
+les jalons, les mesures, les pratiques et le protocole conduit — puis les ecrit. Cote serveur,
+comme l'analyse : ca marche meme si l'onglet se ferme.
+
 ## Modes
 
 - **Deblocage** : decharge emotionnelle en temps reel, questions chirurgicales
 - **Journal du soir** : rituel nocturne, entree vocale, accompagnement doux
+- **Check-in** : le rituel quotidien, structure, hors conversation
 
 ## Memoire
 
@@ -119,6 +163,17 @@ par la synthese vocale.
   n'etait pas proprement termine etait perdu.
 - **Engagements** : les actions non faites des 14 derniers jours sont injectees dans le prompt, et
   le superviseur decide quand le coach demande ou ca en est.
+
+## Crons (Vercel)
+
+- `/api/notifications/send` toutes les 2 h : rappels d'exercice + relances du quotidien
+  (intention du matin 7-10 h, pratique 17-20 h, depot du soir 20-23 h, heure de Paris, une seule
+  notification par personne et par passage).
+- `/api/bilans/generate?type=weekly` le lundi a 6 h : le miroir hebdo.
+- `/api/bilans/generate` le 1er du mois a 8 h : mensuel, et annuel en janvier.
+
+Vercel declenche les crons en **GET** : les deux routes n'exposaient que POST, elles repondaient
+donc 405 a chaque passage depuis toujours. Elles exportent maintenant les deux.
 
 ## Fonctionnalites v2
 

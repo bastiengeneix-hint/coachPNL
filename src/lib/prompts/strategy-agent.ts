@@ -28,6 +28,10 @@ export const MOVES = [
   'teach',
   'protocol',
   'exercise',
+  // Demander des comptes sur un engagement, un relevé, une pratique décrochée.
+  'accountability',
+  // Poser (ou reformuler) l'objectif du parcours.
+  'program_setup',
 ] as const;
 
 export const LENGTHS = ['short', 'medium', 'long'] as const;
@@ -56,6 +60,8 @@ export interface CoachingStrategy {
   user_words: string[];
   /** Engagement passé à reprendre dans ce message (ou null). */
   follow_up: string | null;
+  /** Point de l'ordre du jour du suivi à traiter maintenant (1-indexé), ou null. */
+  agenda_item: number | null;
   /** Concept de lecture à intégrer (null si rien de pertinent). */
   book_concept: { idea: string; how_to_use: string } | null;
   /** Patterns répétitifs détectés dans les derniers messages du coach. */
@@ -122,6 +128,12 @@ Thèmes récurrents des dernières séances : ${themes}
 ## Engagements pris aux séances précédentes (pas encore soldés)
 ${engagements}
 
+## Son suivi (parcours, mesures, pratiques)
+${params.snapshotBriefing}
+
+## Ordre du jour du suivi — calculé, pas négociable sur le FOND, à toi de choisir le MOMENT
+${params.agenda.length > 0 ? params.agenda.map((a, i) => `${i + 1}. ${a}`).join('\n') : 'Rien de dû dans le suivi.'}
+
 ## Phase de la séance : ${params.phase} — ${params.exchangeCount} échange(s), ${params.elapsedMinutes} min écoulées
 ${params.shouldLand ? 'ON REFERME : plus aucun sujet nouveau, il faut du concret avant la fin.' : 'On a encore du temps devant nous.'}
 
@@ -139,7 +151,7 @@ ${params.protocolCatalog}
 
 ## RÉPONDS EN JSON, STRUCTURE EXACTE
 {
-  "move": "mirror|observation|metaphor|confrontation|celebration|silence|provocation|personal_share|zoom_out|reframe|teach|protocol|exercise",
+  "move": "mirror|observation|metaphor|confrontation|celebration|silence|provocation|personal_share|zoom_out|reframe|teach|protocol|exercise|accountability|program_setup",
   "length": "short|medium|long",
   "tone": "warm|direct|playful|serious|tender",
   "user_emotion": "l'émotion principale (1-3 mots)",
@@ -150,6 +162,7 @@ ${params.protocolCatalog}
   "session_goal": "ce que ${params.userName} cherche à obtenir de cette séance, dans ses mots — \\"\\" si pas encore clair",
   "user_words": ["2 à 4 mots ou expressions EXACTS de son dernier message que le coach doit réutiliser"],
   "follow_up": "engagement passé à reprendre maintenant, ou null",
+  "agenda_item": 1,
   "book_concept": {"idea": "...", "how_to_use": "..."},
   "avoid": ["patterns repérés dans les derniers messages du coach à ne pas répéter"],
   "should_ask_question": true,
@@ -175,11 +188,19 @@ RYTHME
 9. Si les 2 derniers messages du coach ont la même structure (même ouverture, même type de question, même longueur), mets-la dans "avoid".
 10. "silence" = un moment émotionnel fort vient de passer : une phrase, pas plus, et on laisse l'espace.
 
+SUIVI (c'est ce qui fait la différence entre une conversation et un accompagnement)
+11. "agenda_item" : le numéro du point d'ordre du jour à traiter dans CE message, ou null. UN SEUL point par message, jamais deux.
+12. En phase "ouverture" ou "cadrage", s'il y a un relevé dû, un protocole à réévaluer ou un engagement en attente, tu le prends MAINTENANT : c'est comme ça qu'un professionnel ouvre une séance. move = "accountability".
+13. Une fois le point traité (la transcription montre qu'il a répondu), agenda_item = null et tu passes au travail.
+14. Aucun parcours défini + le vrai sujet est identifié + phase "exploration" ou "travail" → move = "program_setup", protocol = "objectif_bien_forme".
+15. En phase "atterrissage" ou "cloture", si le suivi n'a aucune pratique quotidienne ou aucune mesure, le point d'ordre du jour correspondant devient prioritaire : la séance ne doit pas finir sans ça.
+16. Jamais de point d'ordre du jour si risk ≠ "none" ou si emotion_intensity ≥ 4. On ne demande pas un chiffre à quelqu'un qui pleure.
+
 PERTINENCE
-11. "user_words" : recopie ses formulations EXACTES, pas des synonymes. C'est ce qui fait que le coach parle sa langue.
-12. "follow_up" : s'il y a un engagement en attente et que le moment s'y prête (début de séance, ou sujet connexe), c'est maintenant. Sinon null. Ne jamais reprendre un engagement au milieu d'un moment émotionnel fort.
-13. "book_concept" : null si aucun passage ne colle VRAIMENT. Un concept forcé se sent tout de suite.
-14. "session_goal" : garde la même formulation d'un message à l'autre une fois qu'elle est posée. Ne la réinvente pas à chaque tour.`;
+17. "user_words" : recopie ses formulations EXACTES, pas des synonymes. C'est ce qui fait que le coach parle sa langue.
+18. "follow_up" : s'il y a un engagement en attente et que le moment s'y prête (début de séance, ou sujet connexe), c'est maintenant. Sinon null. Ne jamais reprendre un engagement au milieu d'un moment émotionnel fort.
+19. "book_concept" : null si aucun passage ne colle VRAIMENT. Un concept forcé se sent tout de suite.
+20. "session_goal" : garde la même formulation d'un message à l'autre une fois qu'elle est posée. Ne la réinvente pas à chaque tour.`;
 }
 
 interface StrategyParams {
@@ -200,6 +221,10 @@ interface StrategyParams {
   shouldLand: boolean;
   exchangeCount: number;
   elapsedMinutes: number;
+  /** État du suivi, version compacte. */
+  snapshotBriefing: string;
+  /** Ordre du jour calculé (déterministe) : le superviseur choisit QUAND. */
+  agenda: string[];
 }
 
 /**
@@ -219,6 +244,7 @@ export function openingStrategy(mode: 'deblocage' | 'journal'): CoachingStrategy
     session_goal: '',
     user_words: [],
     follow_up: null,
+    agenda_item: null,
     book_concept: null,
     avoid: [],
     should_ask_question: mode === 'journal',
@@ -248,6 +274,8 @@ export async function getCoachingStrategy(params: {
   shouldLand: boolean;
   exchangeCount: number;
   elapsedMinutes: number;
+  snapshotBriefing: string;
+  agenda: string[];
 }): Promise<CoachingStrategy> {
   // Filet local : il prime toujours, même si l'appel au superviseur tombe.
   const localRisk = screenRisk(params.userMessage);
@@ -264,6 +292,7 @@ export async function getCoachingStrategy(params: {
     session_goal: '',
     user_words: [],
     follow_up: null,
+    agenda_item: null,
     book_concept: null,
     avoid: [],
     should_ask_question: false,
@@ -294,6 +323,8 @@ export async function getCoachingStrategy(params: {
             shouldLand: params.shouldLand,
             exchangeCount: params.exchangeCount,
             elapsedMinutes: params.elapsedMinutes,
+            snapshotBriefing: params.snapshotBriefing,
+            agenda: params.agenda,
           }),
         },
       ],
@@ -341,6 +372,11 @@ export async function getCoachingStrategy(params: {
       session_goal: asText(parsed.session_goal, ''),
       user_words: stringArray(parsed.user_words, 5),
       follow_up: asText(parsed.follow_up, '') || null,
+      // Un point de suivi ne se demande pas au-dessus d'une émotion forte.
+      agenda_item:
+        risk === 'none' && params.agenda.length > 0
+          ? boundedIndex(parsed.agenda_item, params.agenda.length)
+          : null,
       book_concept: risk === 'none' ? bookConcept : null,
       avoid: stringArray(parsed.avoid, 6),
       should_ask_question:
@@ -361,6 +397,12 @@ function asText(value: unknown, fallback: string): string {
   const trimmed = value.trim();
   if (!trimmed || trimmed.toLowerCase() === 'null') return fallback;
   return trimmed;
+}
+
+function boundedIndex(value: unknown, max: number): number | null {
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+  if (!Number.isFinite(n) || n < 1 || n > max) return null;
+  return Math.round(n);
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {

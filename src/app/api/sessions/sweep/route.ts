@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { createServerClient } from '@/lib/supabase/server';
 import { analyzeSession } from '@/lib/coach/session-analyzer';
 import { applyProfileEvolution } from '@/lib/memory/apply-evolution';
+import { getCoachingSnapshot } from '@/lib/program/snapshot';
+import { extractHarvest, applyHarvest } from '@/lib/program/harvest';
 import { buildActiveContext } from '@/lib/memory/context-builder';
 import type { Json } from '@/lib/supabase/types';
 import type { Message, Profile, Session } from '@/types';
@@ -51,12 +53,12 @@ export async function POST() {
       return NextResponse.json({ analyzed: 0, closed: 0 });
     }
 
-    // Profil de référence pour comparer l'évolution.
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // Profil et suivi de référence, pour comparer l'évolution.
+    const [{ data: profileRow }, { data: userRow }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('user_id', userId).single(),
+      supabase.from('users').select('name').eq('id', userId).single(),
+    ]);
+    const userName = userRow?.name || 'ami';
 
     const defaultPrefs = { ce_qui_aide: [] as string[], ce_qui_bloque: [] as string[], ton: 'mix' as const };
     const profile: Profile = {
@@ -83,7 +85,12 @@ export async function POST() {
         continue;
       }
 
-      const analysis = await analyzeSession(messages, profile);
+      // Le snapshot est relu à chaque séance : la précédente a pu créer un parcours.
+      const snapshot = await getCoachingSnapshot(supabase, userId);
+      const [analysis, harvest] = await Promise.all([
+        analyzeSession(messages, profile),
+        extractHarvest({ userName, messages, snapshot }),
+      ]);
 
       await supabase
         .from('sessions')
@@ -102,6 +109,12 @@ export async function POST() {
         await applyProfileEvolution(supabase, userId, analysis.profile_evolution);
       } catch (evolutionError) {
         console.warn('Sweep: profile evolution skipped:', evolutionError);
+      }
+
+      try {
+        await applyHarvest(supabase, userId, row.id, harvest, snapshot);
+      } catch (harvestError) {
+        console.warn('Sweep: harvest skipped:', harvestError);
       }
 
       analyzed++;
