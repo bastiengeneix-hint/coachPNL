@@ -84,6 +84,8 @@ export function buildProgramBlock(params: {
   pendingExercice?: string | null;
   /** Ordre du jour déjà calculé par l'appelant. */
   agenda?: string[];
+  /** false = trop tôt dans la séance : on affiche le suivi, pas les injonctions. */
+  agendaAllowed?: boolean;
 }): string {
   const { snapshot, userName } = params;
   const parts: string[] = [`## LE SUIVI DE ${userName}`];
@@ -188,23 +190,33 @@ export function buildProgramBlock(params: {
   }
 
   // ── Ordre du jour ─────────────────────────────────────────────────────────
+  // Tant qu'on n'a pas écouté, on ne met PAS la liste de ce qui est dû sous les
+  // yeux du coach : il s'en sert, c'est humain, et la séance devient un contrôle.
   const agenda = params.agenda ?? buildFollowUpAgenda(snapshot);
-  if (agenda.length > 0) {
+  const agendaAllowed = params.agendaAllowed !== false;
+
+  if (agenda.length > 0 && agendaAllowed) {
     parts.push(
-      `### CE QUI EST DÛ — ordre de priorité\n${agenda.map((a, i) => `${i + 1}. ${a}`).join('\n')}`
+      `### CE QUI EST DÛ — à placer au bon moment, jamais en force\n${agenda.map((a, i) => `${i + 1}. ${a}`).join('\n')}`
     );
   }
 
   // ── Comment s'en servir ───────────────────────────────────────────────────
-  const rules = [
-    "Tu ne traites PAS tout ça dans un seul message : la consigne du message te dit quand. Mais rien de cette liste ne doit disparaître d'une séance à l'autre.",
-    "Un relevé, ça se demande avec la question exacte, et tu accueilles le chiffre sans commentaire moralisateur.",
-    "Tu connais ces chiffres, donc tu ne redemandes pas ce que tu sais déjà. Rien n'est plus vexant qu'un coach qui a oublié.",
-    "Quand un chiffre a bougé dans le bon sens, tu le nommes précisément — c'est la preuve que ça avance, et c'est ce qui donne envie de continuer.",
-    "Une séance ne se termine pas sans un pas concret rattaché au parcours : soit une action datée, soit une pratique quotidienne, soit un relevé.",
-  ];
+  const rules = agendaAllowed
+    ? [
+        "Tu ne traites PAS tout ça dans un seul message, et souvent aucun : la consigne du message te dit quoi faire.",
+        "Un point de suivi se glisse dans la conversation quand elle s'y prête. Il ne passe jamais devant ce que la personne est en train d'amener.",
+        "Un relevé, ça se demande avec la question exacte, et tu accueilles le chiffre sans commentaire moralisateur.",
+        "Tu connais ces chiffres, donc tu ne redemandes pas ce que tu sais déjà. Rien n'est plus vexant qu'un coach qui a oublié.",
+        "Quand un chiffre a bougé dans le bon sens, tu le nommes précisément — c'est la preuve que ça avance.",
+      ]
+    : [
+        "Tu as tout ça en tête, et ça suffit : ça nourrit ta compréhension, ça ne pilote pas ce que tu dis.",
+        "Début de séance : tu écoutes ce qui est amené AUJOURD'HUI. Aucune relance, aucun relevé, aucune demande de comptes — même si quelque chose traîne. Ça attendra le bon moment.",
+        "Si la personne parle elle-même d'un engagement ou d'une pratique, là tu peux rebondir. C'est elle qui ouvre la porte, pas toi.",
+      ];
 
-  if (params.followUp) {
+  if (params.followUp && agendaAllowed) {
     rules.unshift(`À REPRENDRE MAINTENANT, dans ce message : « ${params.followUp} ».`);
   }
 

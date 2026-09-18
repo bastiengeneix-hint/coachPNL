@@ -347,7 +347,10 @@ Aucune conversation passée. Si ${userName} fait référence à un échange pré
 
 Ce sont de vrais échanges. Fais des liens naturels. N'invente jamais un détail qui n'y est pas.`];
 
-  for (const session of sessionsWithMessages) {
+  // Trois séances, six messages chacune : au-delà, le passé pèse plus lourd que
+  // le présent dans le prompt, et le coach répond à l'historique au lieu de
+  // répondre à la personne.
+  for (const session of sessionsWithMessages.slice(0, 3)) {
     const date = new Date(session.date);
     const daysAgo = Math.round((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
     const timeLabel = daysAgo === 0 ? "aujourd'hui" : daysAgo === 1 ? 'hier' : `il y a ${daysAgo} jours`;
@@ -356,11 +359,11 @@ Ce sont de vrais échanges. Fais des liens naturels. N'invente jamais un détail
     const msgs = Array.isArray(session.messages) ? session.messages : [];
     if (msgs.length === 0) continue;
 
-    const recentMsgs = msgs.slice(-10);
+    const recentMsgs = msgs.slice(-6);
     const conversationLines = recentMsgs
       .map((m) => {
         const speaker = m.role === 'user' ? userName : 'Coach';
-        const content = m.content.length > 500 ? m.content.slice(0, 500) + '...' : m.content;
+        const content = m.content.length > 280 ? m.content.slice(0, 280) + '…' : m.content;
         return `${speaker}: ${content}`;
       })
       .join('\n');
@@ -407,7 +410,7 @@ function buildStrategyBlock(userName: string, strategy: CoachingStrategy, agenda
   };
 
   const lengthInstructions: Record<string, string> = {
-    short: '1 à 2 phrases. Rien de plus.',
+    short: '1 à 2 phrases. C\'est un choix, pas une économie : ce que tu dis doit pouvoir résonner dans le silence qui suit.',
     medium: '3 à 5 phrases. Tu développes ton point et tu t\'arrêtes.',
     long: 'Jusqu\'à 8-10 phrases si le moment le mérite. Prends ton temps, reste parlé.',
   };
@@ -498,6 +501,8 @@ export interface BuildPromptParams {
   snapshot?: CoachingSnapshot | null;
   /** Ordre du jour calculé à partir du snapshot (évite de le recalculer). */
   agenda?: string[];
+  /** false = trop tôt dans la séance pour que le suivi s'exprime. */
+  agendaAllowed?: boolean;
   sessionsTotal?: number;
   firstSessionDate?: string | null;
 }
@@ -540,6 +545,7 @@ export function buildSystemPromptParts(params: BuildPromptParams): { stable: str
           followUp: params.strategy?.follow_up || null,
           pendingExercice: params.activeContext.pending_exercice,
           agenda: params.agenda,
+          agendaAllowed: params.agendaAllowed,
         })
       : '',
     buildConversationHistoryBlock(params.userName, params.recentSessions || []),
