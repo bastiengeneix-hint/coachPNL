@@ -40,6 +40,10 @@ function SessionContent() {
   const sessionRef = useRef<Session | null>(null);
   const voiceInputRef = useRef<VoiceInputHandle>(null);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
+  // Le serveur est sans état d'un message à l'autre : c'est le client qui lui
+  // rappelle ce que le coach vient de jouer, pour qu'il n'enchaîne pas deux
+  // gestes durs (confrontation, demande de comptes) d'affilée.
+  const previousMoveRef = useRef<string | null>(null);
 
   // Keep sessionRef in sync
   useEffect(() => {
@@ -139,6 +143,8 @@ function SessionContent() {
         console.error('Coach API error:', data);
         throw new Error(data.error || 'Failed to get coach response');
       }
+      previousMoveRef.current = data.meta?.move ?? null;
+
       const updatedSession = addMessage(newSession, 'coach', data.message);
       setSession(updatedSession);
     } catch (error) {
@@ -182,6 +188,7 @@ function SessionContent() {
           // Le coach a besoin de savoir depuis combien de temps la séance dure
           // pour savoir s'il ouvre encore ou s'il doit faire atterrir.
           startedAt: withUserMsg.messages[0]?.timestamp ?? null,
+          previousMove: previousMoveRef.current,
         }),
       });
 
@@ -190,6 +197,8 @@ function SessionContent() {
         console.error('Coach API error:', data);
         throw new Error(data.error || 'Failed to get coach response');
       }
+      previousMoveRef.current = data.meta?.move ?? null;
+
       const finalSession = addMessage(withUserMsg, 'coach', data.message);
       setSession(finalSession);
 

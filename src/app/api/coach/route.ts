@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildSystemPromptParts } from '@/lib/prompts/system-prompt';
-import { getCoachingStrategy, openingStrategy } from '@/lib/prompts/strategy-agent';
+import { getCoachingStrategy, openingStrategy, MOVES, type CoachingMove } from '@/lib/prompts/strategy-agent';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { COACH_MODEL } from '@/lib/ai/models';
@@ -22,6 +22,10 @@ function getAnthropicKey(): string {
 
 // Le coach a le droit de développer quand le superviseur le demande ; il n'a pas
 // le droit d'être coupé au milieu d'une phrase.
+function isCoachingMove(value: unknown): value is CoachingMove {
+  return typeof value === 'string' && (MOVES as readonly string[]).includes(value);
+}
+
 const MAX_TOKENS_BY_LENGTH: Record<string, number> = {
   short: 400,
   medium: 800,
@@ -37,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { messages, mode, isFirstMessage, startedAt } = await req.json();
+    const { messages, mode, isFirstMessage, startedAt, previousMove } = await req.json();
 
     // 3. Create Supabase client
     const supabase = createServerClient();
@@ -160,6 +164,12 @@ export async function POST(req: NextRequest) {
       mode: mode as SessionMode,
     });
 
+    // Le suivi n'ouvre pas une séance. Tant qu'on n'a pas écouté ce qui est
+    // amené aujourd'hui, aucun relevé, aucune relance, aucune demande de
+    // comptes — sinon le coach accueille son client par un contrôle fiscal.
+    const AGENDA_MIN_EXCHANGES = 3;
+    const agendaAllowed = arc.exchangeCount >= AGENDA_MIN_EXCHANGES;
+
     // ─── 10. SUPERVISEUR (Haiku — rapide) ──────────────────────────────────
     // Il voit la conversation dans l'ordre, la phase, les engagements, et il
     // décide : mouvement, protocole PNL + étape, risque, mots à reprendre.
@@ -187,6 +197,8 @@ export async function POST(req: NextRequest) {
           elapsedMinutes: arc.elapsedMinutes,
           snapshotBriefing: buildSnapshotBriefing(snapshot),
           agenda,
+          agendaAllowed,
+          previousMove: isCoachingMove(previousMove) ? previousMove : null,
         });
 
     console.log(
@@ -217,6 +229,7 @@ export async function POST(req: NextRequest) {
       arc,
       snapshot,
       agenda,
+      agendaAllowed,
       sessionsTotal: sessionsTotal ?? 0,
       firstSessionDate: firstSessionRow?.[0]?.date ?? null,
     });

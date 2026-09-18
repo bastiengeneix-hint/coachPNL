@@ -40,6 +40,9 @@ export const RISKS = ['none', 'detresse', 'crise'] as const;
 
 export type CoachingMove = (typeof MOVES)[number];
 
+/** Gestes qui bousculent. Jamais deux d'affilée : sinon c'est un interrogatoire. */
+const HARD_MOVES: CoachingMove[] = ['confrontation', 'provocation', 'accountability'];
+
 export interface CoachingStrategy {
   /** Quel mouvement de coaching jouer dans ce message. */
   move: CoachingMove;
@@ -75,10 +78,15 @@ const STRATEGY_SYSTEM_PROMPT = `Tu es le superviseur de séance d'un coach PNL. 
 
 Tu es expert en PNL (protocoles, Meta-Modèle, calibration), en coaching professionnel, en dynamique conversationnelle et en lecture émotionnelle.
 
-Tes trois obsessions, dans cet ordre :
-1. La personne d'abord. Si elle est submergée, on accueille — aucune technique.
-2. L'efficacité de la séance. Une séance qui se termine sans rien de concret est une séance ratée.
-3. La justesse du geste. Un bon mouvement au bon moment vaut mieux que trois bonnes idées empilées.
+Tes obsessions, dans cet ordre — l'ordre compte plus que la liste :
+1. COMPRENDRE ce qui se passe pour cette personne, maintenant. Tant que ce n'est pas clair, on écoute. Un coach qui sait déjà quoi dire n'écoute plus.
+2. La justesse du geste. Un bon mouvement au bon moment vaut mieux que trois bonnes idées empilées.
+3. Le suivi — mais jamais au prix des deux premiers. Un point de suivi placé au mauvais moment casse la séance ; il attendra le bon moment, il ne disparaîtra pas.
+
+Ce que tu ne fais JAMAIS :
+- Demander des comptes avant d'avoir écouté ce qui est amené aujourd'hui.
+- Enchaîner deux gestes durs (confrontation, provocation, demande de comptes). Après un geste dur, on reçoit la réponse.
+- Choisir "direct" par défaut. La franchise est un outil, pas une personnalité.
 
 Tu réponds UNIQUEMENT en JSON valide, sans markdown, sans explication.`;
 
@@ -131,8 +139,17 @@ ${engagements}
 ## Son suivi (parcours, mesures, pratiques)
 ${params.snapshotBriefing}
 
-## Ordre du jour du suivi — calculé, pas négociable sur le FOND, à toi de choisir le MOMENT
+## Ordre du jour du suivi
 ${params.agenda.length > 0 ? params.agenda.map((a, i) => `${i + 1}. ${a}`).join('\n') : 'Rien de dû dans le suivi.'}
+
+${
+  params.agendaAllowed
+    ? "Ces points peuvent être repris MAINTENANT si le moment s'y prête vraiment. Un seul, jamais deux, et jamais par-dessus ce que la personne est en train d'amener."
+    : "⛔ TROP TÔT dans la séance : agenda_item = null, obligatoirement. On écoute ce qui est amené aujourd'hui avant de parler du suivi. Ces points ne sont pas perdus, ils reviendront."
+}
+
+## Mouvement du message précédent du coach
+${params.previousMove ?? 'aucun (début de séance)'}
 
 ## Phase de la séance : ${params.phase} — ${params.exchangeCount} échange(s), ${params.elapsedMinutes} min écoulées
 ${params.shouldLand ? 'ON REFERME : plus aucun sujet nouveau, il faut du concret avant la fin.' : 'On a encore du temps devant nous.'}
@@ -183,18 +200,24 @@ PROTOCOLE
 6. En phase "cloture", si un insight est sorti mais qu'aucune action concrète n'a été prise, protocol = "pont_vers_futur".
 
 RYTHME
-7. "length" = "short" par défaut. "medium" quand il faut développer. "long" seulement pour un enseignement, un zoom arrière sur son parcours, ou un partage personnel du coach.
+7. "length" : voir 16e. "long" reste réservé à un enseignement, un zoom arrière sur le parcours, ou un partage personnel du coach.
 8. Si le coach a posé une question dans son dernier message et qu'elle n'a pas été traitée, should_ask_question = false. Poser une question par-dessus une question, c'est un interrogatoire.
 9. Si les 2 derniers messages du coach ont la même structure (même ouverture, même type de question, même longueur), mets-la dans "avoid".
 10. "silence" = un moment émotionnel fort vient de passer : une phrase, pas plus, et on laisse l'espace.
 
-SUIVI (c'est ce qui fait la différence entre une conversation et un accompagnement)
-11. "agenda_item" : le numéro du point d'ordre du jour à traiter dans CE message, ou null. UN SEUL point par message, jamais deux.
-12. En phase "ouverture" ou "cadrage", s'il y a un relevé dû, un protocole à réévaluer ou un engagement en attente, tu le prends MAINTENANT : c'est comme ça qu'un professionnel ouvre une séance. move = "accountability".
-13. Une fois le point traité (la transcription montre qu'il a répondu), agenda_item = null et tu passes au travail.
-14. Aucun parcours défini + le vrai sujet est identifié + phase "exploration" ou "travail" → move = "program_setup", protocol = "objectif_bien_forme".
-15. En phase "atterrissage" ou "cloture", si le suivi n'a aucune pratique quotidienne ou aucune mesure, le point d'ordre du jour correspondant devient prioritaire : la séance ne doit pas finir sans ça.
-16. Jamais de point d'ordre du jour si risk ≠ "none" ou si emotion_intensity ≥ 4. On ne demande pas un chiffre à quelqu'un qui pleure.
+SUIVI — utile, mais il ne conduit pas la séance
+11. "agenda_item" : le numéro du point à traiter dans CE message, ou null. Par défaut c'est **null**. Tu ne le remplis que si les trois conditions sont réunies : le bloc ci-dessus l'autorise, ce que la personne vient de dire n'est pas en train d'ouvrir quelque chose de vivant, et le point est vraiment lié au sujet du moment.
+12. Un point de suivi se glisse dans une conversation, il ne l'ouvre pas. Un seul par séance dans la plupart des cas. Si la transcription montre que le coach a déjà relancé sur le suivi, agenda_item = null.
+13. move = "accountability" UNIQUEMENT si agenda_item n'est pas null. Sinon ce mouvement n'a aucun sens.
+14. Aucun parcours défini : tu ne le poses PAS avant que le vrai sujet soit clair et que la personne se sente entendue — jamais avant la phase "travail". Alors seulement : move = "program_setup", protocol = "objectif_bien_forme".
+15. En phase "cloture", un pas concret est souhaitable — pas obligatoire. Une séance où quelqu'un s'est senti compris n'est pas une séance ratée.
+16. Jamais de point de suivi si risk ≠ "none" ou si emotion_intensity ≥ 4. On ne demande pas un chiffre à quelqu'un qui pleure.
+
+RYTHME ET JUSTESSE
+16b. "confrontation", "provocation" et "accountability" sont des gestes DURS. Jamais deux d'affilée : regarde le mouvement précédent indiqué plus haut. Après un geste dur, on reçoit ce qui revient (mirror, observation, silence).
+16c. Une confrontation exige une preuve : une contradiction visible dans SES mots, dans cette séance. Sans preuve citable, ce n'est pas une confrontation, c'est un jugement — choisis autre chose.
+16d. "tone" : "warm" par défaut. "direct" seulement quand la personne tourne en rond depuis plusieurs messages ou demande explicitement de la franchise. Trois messages directs d'affilée, c'est une engueulade, pas un coaching.
+16e. "length" : "short" pour un miroir, un silence, une observation qui doit résonner. "medium" dès qu'on explore ou qu'on explique — c'est le cas le plus fréquent en phase exploration et travail.
 
 PERTINENCE
 17. "user_words" : recopie ses formulations EXACTES, pas des synonymes. C'est ce qui fait que le coach parle sa langue.
@@ -225,6 +248,10 @@ interface StrategyParams {
   snapshotBriefing: string;
   /** Ordre du jour calculé (déterministe) : le superviseur choisit QUAND. */
   agenda: string[];
+  /** false tant qu'on n'a pas assez écouté : le suivi ne peut pas ouvrir une séance. */
+  agendaAllowed: boolean;
+  /** Mouvement du message précédent du coach, pour ne pas enchaîner deux gestes durs. */
+  previousMove: CoachingMove | null;
 }
 
 /**
@@ -276,6 +303,8 @@ export async function getCoachingStrategy(params: {
   elapsedMinutes: number;
   snapshotBriefing: string;
   agenda: string[];
+  agendaAllowed: boolean;
+  previousMove: CoachingMove | null;
 }): Promise<CoachingStrategy> {
   // Filet local : il prime toujours, même si l'appel au superviseur tombe.
   const localRisk = screenRisk(params.userMessage);
@@ -325,6 +354,8 @@ export async function getCoachingStrategy(params: {
             elapsedMinutes: params.elapsedMinutes,
             snapshotBriefing: params.snapshotBriefing,
             agenda: params.agenda,
+            agendaAllowed: params.agendaAllowed,
+            previousMove: params.previousMove,
           }),
         },
       ],
@@ -345,6 +376,37 @@ export async function getCoachingStrategy(params: {
     // En détresse ou en crise, aucun protocole ne tient : la personne d'abord.
     const safeProtocol = risk === 'none' ? protocol : null;
 
+    // ── Garde-fous déterministes ────────────────────────────────────────
+    // Le modèle a beau avoir la consigne, on ne laisse pas au hasard ce qui
+    // transforme une séance en interrogatoire.
+
+    // Le suivi ne peut pas ouvrir une séance : on écoute d'abord.
+    const agendaItem =
+      risk === 'none' && params.agendaAllowed && params.agenda.length > 0
+        ? boundedIndex(parsed.agenda_item, params.agenda.length)
+        : null;
+
+    let move = oneOf(parsed.move, MOVES, defaultStrategy.move);
+
+    // Deux gestes durs d'affilée : on revient écouter ce qui est revenu.
+    if (
+      params.previousMove &&
+      HARD_MOVES.includes(params.previousMove) &&
+      HARD_MOVES.includes(move)
+    ) {
+      move = 'mirror';
+    }
+
+    // Demander des comptes sans point de suivi à reprendre n'a aucun sens.
+    if (move === 'accountability' && agendaItem === null) {
+      move = risk === 'none' ? 'observation' : 'mirror';
+    }
+
+    // En détresse, aucun geste dur, quoi qu'ait décidé le superviseur.
+    if (risk !== 'none' && HARD_MOVES.includes(move)) {
+      move = 'mirror';
+    }
+
     const bookConcept =
       parsed.book_concept &&
       typeof parsed.book_concept === 'object' &&
@@ -356,8 +418,8 @@ export async function getCoachingStrategy(params: {
         : null;
 
     return {
-      move: oneOf(parsed.move, MOVES, defaultStrategy.move),
-      length: oneOf(parsed.length, LENGTHS, 'short'),
+      move,
+      length: oneOf(parsed.length, LENGTHS, 'medium'),
       tone: oneOf(parsed.tone, TONES, 'warm'),
       user_emotion: asText(parsed.user_emotion, defaultStrategy.user_emotion),
       // En détresse ou en crise, l'intensité ne peut pas être basse : c'est elle
@@ -371,12 +433,8 @@ export async function getCoachingStrategy(params: {
       protocol_step: clampInt(parsed.protocol_step, 1, 12, 1),
       session_goal: asText(parsed.session_goal, ''),
       user_words: stringArray(parsed.user_words, 5),
-      follow_up: asText(parsed.follow_up, '') || null,
-      // Un point de suivi ne se demande pas au-dessus d'une émotion forte.
-      agenda_item:
-        risk === 'none' && params.agenda.length > 0
-          ? boundedIndex(parsed.agenda_item, params.agenda.length)
-          : null,
+      follow_up: agendaItem !== null ? asText(parsed.follow_up, '') || null : null,
+      agenda_item: agendaItem,
       book_concept: risk === 'none' ? bookConcept : null,
       avoid: stringArray(parsed.avoid, 6),
       should_ask_question:
