@@ -40,7 +40,7 @@ export function buildFollowUpAgenda(snapshot: CoachingSnapshot): string[] {
       ? `dernier relevé ${measure.last.value}/10 il y a ${Math.round((Date.now() - new Date(measure.last.recorded_at).getTime()) / 86400000)} jours`
       : 'jamais relevée';
     agenda.push(
-      `RELEVER « ${measure.label} » (${since}). Tu poses la question telle qu'elle a été formulée : « ${measure.question || `de 0 à 10, où tu en es sur ${measure.label} ?`} » — une note, pas un discours.`
+      `RELEVER « ${measure.label} » (${since}). Tu poses la question telle qu'elle a été formulée : « ${measure.question || `de 0 à 10, où tu en es sur ${measure.label} ?`} » — une note, pas un discours. Puis, si le moment s'y prête, LA question qui fait tout le travail : « qu'est-ce qui te ferait passer de ${measure.last ? measure.last.value : 'X'} à ${measure.last ? Math.min(10, measure.last.value + 1) : 'X+1'} ? » Le chiffre ne sert à rien tout seul ; c'est le pas d'après qui compte.`
     );
   }
 

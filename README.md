@@ -61,7 +61,7 @@ src/
     auth/                 # Config NextAuth
     supabase/             # Clients + types Supabase
     memory/               # Store async (API calls) + evolution du profil
-    pnl/                  # Bibliotheque de protocoles PNL (15 protocoles, etape par etape)
+    pnl/                  # Bibliotheque de protocoles (13 protocoles, etape par etape)
     program/              # Le suivi : snapshot (lecture unique) + recolte de fin de seance
     prompts/              # Prompt systeme (bloc stable + bloc contextuel) + superviseur
     coach/                # Arc de seance, filet de securite, analyse de seance
@@ -95,11 +95,9 @@ Il parle. Sa longueur maximale est calee sur la consigne du superviseur.
 
 Trois briques transverses :
 
-- **Protocoles PNL** (`lib/pnl/protocols.ts`) : 15 protocoles decoupes en etapes (objectif bien
-  formule, ancrage, recadrage en six pas, parties en conflit, positions de perception, ligne du
-  temps, sous-modalites, swish, niveaux logiques, SCORE, croyance limitante, Upper Limit Problem,
-  pont vers le futur...). Le superviseur en choisit un, le coach n'en recoit qu'un seul et le
-  conduit **une etape par message**, sans jamais le nommer.
+- **Protocoles** (`lib/pnl/protocols.ts`) : 13 protocoles decoupes en etapes. Le superviseur en
+  choisit un, le coach n'en recoit qu'un seul et le conduit **une etape par message**, sans jamais
+  le nommer.
 - **Arc de seance** (`lib/coach/session-arc.ts`) : ouverture → cadrage → exploration → travail →
   atterrissage → cloture, calcule sans modele a partir du nombre d'echanges et du temps ecoule.
   C'est ce qui empeche une seance de s'arreter sans rien de concret.
@@ -110,6 +108,61 @@ Trois briques transverses :
 Le coach peut aussi proposer un exercice de l'app en collant un marqueur `[[exercice:roue_vie]]`
 dans son message : `components/CoachMessage.tsx` le transforme en bouton et le retire du texte lu
 par la synthese vocale.
+
+## La methode — ce sur quoi on s'appuie, et pourquoi
+
+Le coach garde la forme PNL (bon decoupage pedagogique, protocoles guides) mais son moteur
+conversationnel est **l'entretien motivationnel**, dont les resultats sont les mieux etablis.
+Concretement, dans `lib/prompts/system-prompt.ts` et le superviseur :
+
+- **Quatre gestes**, par frequence : le reflet (de loin le plus frequent), la question ouverte,
+  la valorisation, le resume.
+- **Le discours-changement** est le signal principal : le superviseur classe chaque message
+  (`change_talk`) en *changement*, *statu quo*, *mixte* ou *aucun*. Quand ca penche vers le
+  mouvement, on fait parler davantage ; quand ca defend l'immobilite, **on ne pousse pas** —
+  pousser contre renforce. L'ambivalence n'est pas un probleme a trancher, c'est le lieu du travail.
+- `confrontation` et `provocation` ont ete **retires** des mouvements possibles. Remplaces par
+  `discrepancy` (on renvoie l'ecart entre deux choses que la personne a dites ELLE-MEME, citations
+  a l'appui, sans conclure a sa place) et `affirmation` (nommer un acte reel et precis).
+- **Autonomie** : jamais « tu dois ». Ce qui est decide sous pression ne tient pas.
+- **Auto-compassion** quand quelque chose a lache : se taper dessus produit de l'evitement, et
+  l'evitement est le probleme.
+
+Retire le 2026-09-19, faute de base de preuves : la **calibration VAK / prédicats sensoriels**
+(« il dit *c'est flou* donc reponds en visuel ») qui est l'une des affirmations de la PNL les plus
+testees et les plus dementies, ainsi que les protocoles **swish** et **sous-modalites**.
+
+Ajoute, en s'appuyant sur ce qui marche : l'**obstacle interieur + plan si-alors** dans l'objectif
+bien formule (contraste mental — visualiser la reussite seule demobilise), l'**experience
+comportementale** dans le travail de croyance (c'est le test dans le reel qui fait bouger une
+croyance, pas la discussion), les **pratiques en forme « quand X, je Y »** (intentions
+d'implementation), et la **question du +1** apres chaque releve (« qu'est-ce qui te ferait passer
+de 4 a 5 ? » — c'est le pas d'apres qui compte, pas la note).
+
+Cote affichage, les pratiques montrent la **regularite** (`4/7 cette semaine`) et non la serie :
+une journee manquee ne casse pas une habitude, mais un compteur de serie transforme un jour rate
+en echec total et fait tout lacher.
+
+## Le fil rouge — comment les livres servent
+
+Avant, la bibliotheque etait interrogee **a chaque message** sur la derniere phrase, et le coach
+plaquait le passage qui remontait : des concepts qui tombaient de nulle part.
+
+Maintenant, deux niveaux :
+
+1. **Le fil rouge** (`coach_insights`) : en fin de seance, la bibliotheque est interrogee **une
+   fois**, sur le TRAVAIL de la personne (objectif, croyances, themes) et non sur une phrase
+   isolee. La recolte en tire 0 a 2 idees — 0 est la reponse la plus frequente — avec pourquoi
+   elle parle a cette personne-la et quand s'en servir. Ces idees restent d'une seance a l'autre,
+   et on sait **lesquelles ont deja ete transmises** : le coach ne radote pas, il peut revenir
+   dessus (« le thermostat, la, il vient de se declencher »), ce qui installe l'idee bien mieux
+   qu'une nouvelle. Plafond : 8 idees. Visible sur `/parcours`.
+2. **La recherche au fil du message** ne sert plus qu'a rattraper un sujet neuf : reservee aux
+   messages d'au moins 80 caracteres, apres le debut de seance, et plafonnee a 3 passages (contre
+   9 a chaque message auparavant).
+
+Effet de bord utile : la bibliotheque ne depend plus d'un appel d'embeddings par message, donc une
+cle OpenAI a sec ne casse plus que le rafraichissement de fin de seance.
 
 ## Le parcours — ce qui fait la difference entre une conversation et un accompagnement
 

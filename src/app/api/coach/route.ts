@@ -151,9 +151,20 @@ export async function POST(req: NextRequest) {
       .slice(-5)
       .map((m: { content: string }) => m.content);
 
+    // La bibliothèque sert d'abord par le fil rouge (idées retenues en fin de
+    // séance, présentes dans le prompt). La recherche au fil du message ne sert
+    // plus qu'à rattraper un sujet neuf : on la réserve aux messages qui ont de
+    // la matière, et on en ramène peu. Avant, c'était 9 passages à chaque
+    // message, y compris sur « ouais » — d'où des concepts sortis de nulle part.
+    const MIN_CHARS_FOR_SEARCH = 80;
     let ragPassages: Awaited<ReturnType<typeof retrievePassages>> = [];
-    if (lastUserMessage?.content) {
-      ragPassages = await retrievePassages(lastUserMessage.content, recentUserMessages);
+    if (
+      lastUserMessage?.content &&
+      lastUserMessage.content.length >= MIN_CHARS_FOR_SEARCH &&
+      Array.isArray(messages) &&
+      messages.length >= 4
+    ) {
+      ragPassages = await retrievePassages(lastUserMessage.content, recentUserMessages, 3);
     }
 
     // ─── 9. ARC DE SÉANCE (déterministe, sans modèle) ──────────────────────

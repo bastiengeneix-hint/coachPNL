@@ -335,18 +335,22 @@ export default function ParcoursPage() {
 
           {showNewPractice && (
             <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-3 space-y-3">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Une pratique qui tient a la forme « <span className="text-gray-700">quand [moment précis], je [action]</span> ».
+                Attachée à un moment qui existe déjà dans ta journée, pas à une bonne résolution.
+              </p>
               <input
                 type="text"
                 value={newPractice.label}
                 onChange={(e) => setNewPractice((p) => ({ ...p, label: e.target.value }))}
-                placeholder="La micro-action (moins de 5 minutes)"
+                placeholder="L'action, en moins de 5 minutes"
                 className="w-full rounded-xl py-3 px-4 text-[15px] text-gray-800 placeholder:text-gray-400 bg-stone-50 border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all"
               />
               <input
                 type="text"
                 value={newPractice.declencheur}
                 onChange={(e) => setNewPractice((p) => ({ ...p, declencheur: e.target.value }))}
-                placeholder="Le déclencheur — avant chaque call, en fermant l'ordi…"
+                placeholder="Quand ? Avant chaque call, en fermant l'ordi le soir…"
                 className="w-full rounded-xl py-3 px-4 text-[15px] text-gray-800 placeholder:text-gray-400 bg-stone-50 border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all"
               />
               <button
@@ -409,7 +413,7 @@ export default function ParcoursPage() {
                         </div>
                       ))}
                       <span className="ml-auto text-xs text-gray-400">
-                        {p.streak > 0 ? `${p.streak} d'affilée` : p.slipping ? 'décrochée' : '—'}
+                        {p.last_7}/7 cette semaine
                       </span>
                     </div>
                   </div>
@@ -484,6 +488,36 @@ export default function ParcoursPage() {
                 );
               })}
             </div>
+          </section>
+        )}
+
+        {/* Le fil rouge des livres */}
+        {snapshot && snapshot.insights.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-3">
+              Ce que tes lectures disent de ton travail
+            </h2>
+            <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+              {snapshot.insights.map((insight) => (
+                <div key={insight.id} className="p-4">
+                  <p className="text-[15px] text-gray-800 leading-snug">{insight.idee}</p>
+                  {insight.pourquoi && (
+                    <p className="text-sm text-gray-500 leading-snug mt-1">{insight.pourquoi}</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    {insight.source}
+                    {insight.transmise_le
+                      ? ` · vu ensemble le ${new Date(insight.transmise_le).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
+                      : ' · pas encore abordé'}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+              Ces idées sont choisies en fin de séance à partir de ton objectif et de ce qui
+              s&apos;est réellement dit. Le coach en sort une quand le moment s&apos;y prête, pas
+              parce qu&apos;elle est dans la liste.
+            </p>
           </section>
         )}
 

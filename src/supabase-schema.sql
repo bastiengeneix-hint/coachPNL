@@ -384,3 +384,28 @@ CREATE TRIGGER programs_updated_at
   BEFORE UPDATE ON programs
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at();
+
+-- ─── 9. LE FIL ROUGE — les idées de ses livres, choisies pour SON travail ───
+-- Ajouté le 2026-09-19. Avant, les livres étaient interrogés à chaque message
+-- et le coach plaquait le passage qui remontait. Ici on garde une poignée
+-- d'idées, choisies en fin de séance selon l'objectif et les thèmes réels,
+-- et on sait lesquelles ont déjà été transmises — donc plus de radotage, et
+-- une continuité d'une séance à l'autre.
+
+CREATE TABLE IF NOT EXISTS coach_insights (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  program_id UUID REFERENCES programs(id) ON DELETE SET NULL,
+  source TEXT NOT NULL,
+  idee TEXT NOT NULL,
+  pourquoi TEXT,
+  comment_utiliser TEXT,
+  theme TEXT,
+  transmise_le TIMESTAMPTZ,
+  fois_utilisee INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_coach_insights_user ON coach_insights(user_id, created_at DESC);
+
+ALTER TABLE coach_insights ENABLE ROW LEVEL SECURITY;

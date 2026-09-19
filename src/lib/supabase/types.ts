@@ -652,6 +652,42 @@ export interface Database {
         };
         Relationships: [];
       };
+      coach_insights: {
+        Row: {
+          id: string;
+          user_id: string;
+          program_id: string | null;
+          source: string;
+          idee: string;
+          pourquoi: string | null;
+          comment_utiliser: string | null;
+          theme: string | null;
+          transmise_le: string | null;
+          fois_utilisee: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          program_id?: string | null;
+          source: string;
+          idee: string;
+          pourquoi?: string | null;
+          comment_utiliser?: string | null;
+          theme?: string | null;
+          transmise_le?: string | null;
+          fois_utilisee?: number;
+        };
+        Update: {
+          idee?: string;
+          pourquoi?: string | null;
+          comment_utiliser?: string | null;
+          theme?: string | null;
+          transmise_le?: string | null;
+          fois_utilisee?: number;
+        };
+        Relationships: [];
+      };
       checkins: {
         Row: {
           id: string;
