@@ -5,7 +5,8 @@ import { createServerClient } from '@/lib/supabase/server';
 import { analyzeSession } from '@/lib/coach/session-analyzer';
 import { applyProfileEvolution } from '@/lib/memory/apply-evolution';
 import { getCoachingSnapshot } from '@/lib/program/snapshot';
-import { extractHarvest, applyHarvest } from '@/lib/program/harvest';
+import { extractHarvest, applyHarvest, buildLibraryQuery } from '@/lib/program/harvest';
+import { retrievePassages } from '@/lib/rag/retrieve';
 import type { Message, Profile } from '@/types';
 
 const FREQUENCY_HOURS: Record<string, number> = {
@@ -57,11 +58,19 @@ export async function POST(req: NextRequest) {
 
     const userName = userRow?.name || 'ami';
 
+    // La bibliothèque est interrogée UNE fois par séance, sur le travail de fond
+    // — pas à chaque message sur la dernière phrase. C'est ce qui donne un fil
+    // rouge au lieu d'un concept tiré au hasard.
+    const libraryQuery = buildLibraryQuery(snapshot, profile);
+    const ragPassages = libraryQuery
+      ? await retrievePassages(libraryQuery, [], 6)
+      : [];
+
     // Deux lectures indépendantes de la même séance : le résumé et la récolte.
     // Séparées exprès — un seul appel qui fait les deux fait mal les deux.
     const [analysis, harvest] = await Promise.all([
       analyzeSession(messages, profile),
-      extractHarvest({ userName, messages, snapshot }),
+      extractHarvest({ userName, messages, snapshot, ragPassages }),
     ]);
 
     // Profil : croyances, patterns, barrières ULP, lexique.

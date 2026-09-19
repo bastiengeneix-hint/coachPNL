@@ -217,6 +217,16 @@ export interface SessionHarvest {
   } | null;
   /** Protocoles anciens réévalués pendant cette séance (ids). */
   protocols_revisited: Array<{ protocol_id: string; note: string | null }>;
+  /** Idées tirées des livres à retenir pour la suite du travail (0 à 2). */
+  book_insights: Array<{
+    source: string;
+    idee: string;
+    pourquoi: string | null;
+    comment_utiliser: string | null;
+    theme: string | null;
+  }>;
+  /** Idées du fil rouge que le coach a réellement transmises dans cette séance. */
+  insights_transmitted: string[];
 }
 
 // --- Reminder types ---
@@ -381,6 +391,28 @@ export interface ProtocolRun {
   ran_at: string;
 }
 
+/**
+ * Une idée tirée de sa bibliothèque, retenue parce qu'elle parle à SON travail.
+ *
+ * Avant, les livres étaient interrogés à chaque message et le coach plaquait
+ * le passage qui remontait — d'où des concepts qui tombaient de nulle part.
+ * Ici, une poignée d'idées sont choisies en fin de séance en fonction de
+ * l'objectif et des thèmes réels, elles restent d'une séance à l'autre, et on
+ * sait lesquelles ont déjà été transmises. C'est un fil rouge, plus un moteur
+ * de recherche.
+ */
+export interface CoachInsight {
+  id: string;
+  source: string;
+  idee: string;
+  pourquoi: string | null;
+  comment_utiliser: string | null;
+  theme: string | null;
+  transmise_le: string | null;
+  fois_utilisee: number;
+  created_at: string;
+}
+
 export type CheckinMoment = 'matin' | 'soir';
 
 export interface Checkin {
@@ -403,6 +435,8 @@ export interface Checkin {
  */
 export interface CoachingSnapshot {
   program: Program | null;
+  /** Le fil rouge : les idées de ses livres retenues pour CE travail. */
+  insights: CoachInsight[];
   milestones: ProgramMilestone[];
   measures: MeasureWithHistory[];
   practices: PracticeWithProgress[];

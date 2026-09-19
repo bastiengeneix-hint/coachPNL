@@ -316,13 +316,17 @@ export default function HomePage() {
                       <p className="text-xs text-gray-400 mt-0.5">{practice.declencheur}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1.5 text-xs">
-                      {practice.streak > 0 && (
-                        <span className="text-teal-700 font-medium">
-                          {practice.streak} jour{practice.streak > 1 ? 's' : ''} d&apos;affilée
+                      {/* La régularité d'abord : un compteur de série transforme
+                          un jour manqué en échec, et fait lâcher le reste. */}
+                      <span className="text-teal-700 font-medium">
+                        {practice.last_7}/7 cette semaine
+                      </span>
+                      {practice.streak >= 3 && (
+                        <span className="text-gray-400">
+                          {practice.streak} jours d&apos;affilée
                         </span>
                       )}
-                      <span className="text-gray-400">{practice.last_7}/7 cette semaine</span>
-                      {practice.slipping && <span className="text-amber-600 font-medium">décrochée</span>}
+                      {practice.slipping && <span className="text-amber-600">on reprend quand tu veux</span>}
                     </div>
                   </div>
                 </div>

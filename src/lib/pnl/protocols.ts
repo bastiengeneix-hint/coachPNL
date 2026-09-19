@@ -1,7 +1,16 @@
-// ─── PROTOCOLES PNL ─────────────────────────────────────────────────────────
-// La PNL n'est pas un vocabulaire, c'est une suite de protocoles guidés pas à pas.
-// Avant, le prompt listait 6 techniques en une ligne chacune : le coach pouvait
-// dire « on va faire un ancrage » sans jamais savoir le conduire.
+// ─── PROTOCOLES ─────────────────────────────────────────────────────────────
+// Des séquences guidées pas à pas, pas un vocabulaire. Le coach doit savoir
+// CONDUIRE, pas seulement nommer.
+//
+// Sur les sources : on garde la forme PNL (bon découpage pédagogique) mais
+// seulement les protocoles dont le mécanisme tient debout ailleurs que dans la
+// littérature PNL — recadrage ≈ restructuration cognitive (TCC), parties en
+// conflit ≈ travail de l'ambivalence (entretien motivationnel), ligne du temps
+// ≈ projection épisodique et contraste mental, objectif bien formulé ≈ fixation
+// d'objectifs + WOOP.
+// Retirés le 2026-09-19 : `swish` et `submodalites`, dont les mécanismes
+// revendiqués ne sont étayés par aucune donnée sérieuse. Les séances déjà
+// enregistrées avec ces identifiants restent lisibles (repli sur l'id brut).
 //
 // Ici chaque protocole est décomposé en étapes. Le superviseur en choisit UN (ou
 // aucun), on n'injecte que celui-là dans le prompt du coach, avec l'étape en cours.
@@ -16,8 +25,6 @@ export type ProtocolId =
   | 'parties_en_conflit'
   | 'positions_perception'
   | 'ligne_du_temps'
-  | 'submodalites'
-  | 'swish'
   | 'niveaux_logiques'
   | 'score'
   | 'croyance_limitante'
@@ -51,6 +58,8 @@ export const PROTOCOLS: Record<ProtocolId, Protocol> = {
       'CONTEXTUALISER : "Où, quand, avec qui ? Et où tu ne le veux PAS ?"',
       'Vérifier le CONTRÔLE : "Qu\'est-ce que TU peux faire, toi, sans que personne d\'autre change ?"',
       'ÉCOLOGIE : "Qu\'est-ce que tu perds si tu l\'obtiens ? Ça coûte quoi, à qui ?"',
+      'OBSTACLE INTÉRIEUR : "Qu\'est-ce qui, CHEZ TOI, va se mettre en travers ? Pas les circonstances — toi." Creuser jusqu\'à ce que ce soit précis et personnel. C\'est l\'étape que tout le monde saute, et c\'est celle qui fait la différence : imaginer la réussite sans regarder l\'obstacle démobilise au lieu de mobiliser.',
+      'PLAN SI-ALORS : "Quand [cet obstacle précis] se présente, tu fais quoi, exactement ?" Une phrase de la forme « quand X, je fais Y ». Pas une intention : une règle.',
       'PREMIER PAS : "C\'est quoi la plus petite chose que tu peux faire dans les 48 h ?"',
     ],
     sortie: 'Faire répéter l\'objectif par la personne, dans SES mots, en une phrase. Si elle n\'y arrive pas, l\'objectif n\'est pas encore formulé.',
@@ -123,8 +132,8 @@ export const PROTOCOLS: Record<ProtocolId, Protocol> = {
   parties_en_conflit: {
     id: 'parties_en_conflit',
     nom: 'Négociation des parties',
-    quand: 'Ambivalence, tiraillement : "je veux partir mais je veux rester", "une partie de moi...".',
-    intention: 'Faire dialoguer les deux voix au lieu de laisser l\'une écraser l\'autre.',
+    quand: 'Ambivalence, tiraillement : "je veux partir mais je veux rester", "une partie de moi...". L\'ambivalence est normale — c\'est même le lieu du changement. On l\'explore, on ne la tranche pas à sa place.',
+    intention: 'Faire dialoguer les deux voix au lieu de laisser l\'une écraser l\'autre. Surtout : ne JAMAIS prendre le parti du changement contre la voix qui freine — la pousser dans ses retranchements la renforce, c\'est le résultat le plus constant de la recherche sur l\'ambivalence.',
     etapes: [
       'SÉPARER : "Y\'a deux voix. Donne-moi la première : elle dit quoi, avec ses mots ?" puis la seconde. Les faire parler l\'une après l\'autre, jamais en même temps.',
       'INTENTION de chacune : "Qu\'est-ce que celle-là veut pour toi, au fond ?" — remonter jusqu\'à ce que les deux intentions soient respectables.',
@@ -162,38 +171,6 @@ export const PROTOCOLS: Record<ProtocolId, Protocol> = {
       'RAMENER : "Reviens à aujourd\'hui. Tu gardes quoi de ce que tu viens de voir ?"',
     ],
     sortie: 'Un choix clarifié, ou au minimum le critère qui manquait pour choisir.',
-  },
-
-  submodalites: {
-    id: 'submodalites',
-    nom: 'Sous-modalités (baisser le volume)',
-    quand: 'Une image, une voix intérieure ou un souvenir tourne en boucle et parasite.',
-    intention: 'Modifier la forme de la représentation pour faire tomber l\'intensité.',
-    etapes: [
-      'DÉCRIRE la forme, pas le contenu : "Quand tu y penses, c\'est une image ? Elle est où dans l\'espace ? Grande comment ? En couleur ? Y\'a un son, une voix ?"',
-      'MESURER : "Là, l\'intensité, c\'est combien sur 10 ?"',
-      'MODIFIER une seule variable à la fois : "Éloigne l\'image. Passe-la en noir et blanc. Baisse le volume de la voix. Mets-lui la voix de Donald Duck." Puis remesurer.',
-      'GARDER ce qui fait baisser, défaire ce qui fait monter.',
-      'STABILISER : "Laisse-la comme ça. Rappelle-la. Elle revient comment ?"',
-    ],
-    sortie: 'Une intensité mesurée plus basse qu\'au départ, et le réglage à refaire seul.',
-    contre_indications: 'Si c\'est un souvenir traumatique lourd, ne pas creuser : nommer, sécuriser, et orienter vers un pro (EMDR, thérapeute).',
-  },
-
-  swish: {
-    id: 'swish',
-    nom: 'Swish',
-    quand: 'Un déclencheur automatique provoque toujours la même réaction subie (le mail du client, la salle de réunion, le miroir).',
-    intention: 'Remplacer l\'image déclencheuse par l\'image de soi ressource.',
-    etapes: [
-      'IMAGE DÉCLENCHEUSE : "L\'instant juste avant que ça part — tu vois quoi ?" (grande, proche).',
-      'IMAGE DÉSIRÉE : "Et le toi qui a déjà réglé ça, il a l\'air de quoi ?" — image de SOI, vue de l\'extérieur, attirante.',
-      'BRISER L\'ÉTAT.',
-      'SWISH : "L\'image de départ en grand. Le toi désiré en petit dans un coin. Maintenant : la petite explose en grand, la grande se ratatine. Swish !" Rapide.',
-      'RÉPÉTER 5 fois, de plus en plus vite, avec un blanc entre chaque.',
-      'TESTER : "Repense au déclencheur. Il vient quoi maintenant ?"',
-    ],
-    sortie: 'L\'image de départ ne revient plus seule, ou revient affaiblie.',
   },
 
   niveaux_logiques: {
@@ -236,9 +213,9 @@ export const PROTOCOLS: Record<ProtocolId, Protocol> = {
       'CONTRE-EXEMPLES : "Une fois, une seule, où c\'était pas vrai ?" Puis une deuxième. Ne pas lâcher sur ce point.',
       'COÛT : "Elle t\'a coûté quoi, cette croyance, jusqu\'ici ? Et elle t\'a protégé de quoi ?" (les deux)',
       'ALTERNATIVE : "Qu\'est-ce que tu pourrais croire à la place, que tu croirais vraiment ?" — crédible, pas une affirmation positive creuse.',
-      'ÉCOLOGIE + PREUVE : "Tu saurais quoi, cette semaine, qui te montrerait que la nouvelle est vraie ?"',
+      'EXPÉRIENCE À TENTER : construire ensemble un test concret et daté dont le résultat départagera l\'ancienne et la nouvelle croyance. "Qu\'est-ce que tu pourrais FAIRE cette semaine dont le résultat te dirait laquelle des deux est vraie ?" Faire PRÉDIRE à l\'avance ce que l\'ancienne croyance annonce, puis comparer avec ce qui se passe vraiment. C\'est ça qui fait bouger une croyance — pas la discussion.',
     ],
-    sortie: 'Une croyance alternative formulée par la personne + une preuve à aller chercher dans le réel.',
+    sortie: 'Une croyance alternative formulée par la personne + une expérience datée à mener dans le réel, avec sa prédiction notée avant.',
   },
 
   upper_limit: {
@@ -266,7 +243,7 @@ export const PROTOCOLS: Record<ProtocolId, Protocol> = {
       'ANCRER dans une situation PRÉCISE : "La prochaine fois que tu vas te retrouver dans [situation réelle, datée], ça va se passer comment ?"',
       'RÉPÉTITION MENTALE : la faire dérouler la scène à la première personne, au présent.',
       'OBSTACLE : "Qu\'est-ce qui pourrait t\'empêcher de le faire ? Et là, tu fais quoi ?"',
-      'ENGAGEMENT : une action, une date, et à qui elle en rend compte (à toi, à la prochaine séance).',
+      'ENGAGEMENT : une action, une date, et à qui elle en rend compte (à toi, à la prochaine séance). Formule-la en « quand X, je fais Y » plutôt qu\'en « je vais essayer de » — une intention attachée à un moment précis de la journée se tient, une bonne résolution non.',
     ],
     sortie: 'Une action concrète, datée, formulée par la personne. Sinon la séance reste une conversation agréable.',
   },

@@ -5,7 +5,8 @@ import { createServerClient } from '@/lib/supabase/server';
 import { analyzeSession } from '@/lib/coach/session-analyzer';
 import { applyProfileEvolution } from '@/lib/memory/apply-evolution';
 import { getCoachingSnapshot } from '@/lib/program/snapshot';
-import { extractHarvest, applyHarvest } from '@/lib/program/harvest';
+import { extractHarvest, applyHarvest, buildLibraryQuery } from '@/lib/program/harvest';
+import { retrievePassages } from '@/lib/rag/retrieve';
 import { buildActiveContext } from '@/lib/memory/context-builder';
 import type { Json } from '@/lib/supabase/types';
 import type { Message, Profile, Session } from '@/types';
@@ -87,9 +88,12 @@ export async function POST() {
 
       // Le snapshot est relu à chaque séance : la précédente a pu créer un parcours.
       const snapshot = await getCoachingSnapshot(supabase, userId);
+      const libraryQuery = buildLibraryQuery(snapshot, profile);
+      const ragPassages = libraryQuery ? await retrievePassages(libraryQuery, [], 6) : [];
+
       const [analysis, harvest] = await Promise.all([
         analyzeSession(messages, profile),
-        extractHarvest({ userName, messages, snapshot }),
+        extractHarvest({ userName, messages, snapshot, ragPassages }),
       ]);
 
       await supabase

@@ -15,6 +15,7 @@ import type { CoachingSnapshot, Message, SessionHarvest, PracticeCadence } from 
 
 const MAX_ACTIVE_MEASURES = 4;
 const MAX_ACTIVE_PRACTICES = 3;
+const MAX_INSIGHTS = 8;
 const DEFAULT_REVISIT_DAYS = 7;
 
 function getAnthropic() {
@@ -30,7 +31,7 @@ Tu es sévère. Tu n'inventes RIEN. Si la séance ne contient pas la matière, t
 Règles de fond :
 - Un objectif n'est retenu que s'il est formulé au POSITIF, VÉRIFIABLE et SOUS SON CONTRÔLE. "Arrêter de stresser" n'est pas un objectif. "Envoyer mes devis à mon vrai prix sans me justifier" en est un.
 - Une mesure est un ressenti notable de 0 à 10, nommé AVEC SES MOTS À ELLE. Sa "question" est la phrase exacte que le coach lui reposera dans deux semaines.
-- Une pratique est une micro-action de moins de 5 minutes, avec un DÉCLENCHEUR concret ("avant chaque call client", "en fermant l'ordi le soir"). Pas une intention ("être plus présent").
+- Une pratique est une micro-action de moins de 5 minutes attachée à un DÉCLENCHEUR concret et déjà présent dans sa journée ("avant chaque call client", "en fermant l'ordi le soir"). La forme qui fonctionne est « QUAND [situation précise], JE [action précise] » — une règle, pas une intention. "Être plus présent" n'est pas une pratique ; "quand je m'assois à table le soir, je pose mon téléphone dans l'autre pièce" en est une. Sans déclencheur situé, ne la retiens pas.
 - Une action ponctuelle ("appeler Pierre demain") n'est PAS une pratique. Ne la mets pas ici.
 - Le protocole : uniquement si le coach en a réellement conduit un dans la séance, même partiellement.
 
@@ -40,6 +41,7 @@ function buildHarvestUserPrompt(params: {
   userName: string;
   conversation: string;
   snapshot: CoachingSnapshot;
+  ragPassages: Array<{ livre: string; content: string }>;
 }): string {
   const { snapshot } = params;
 
@@ -64,6 +66,16 @@ Jalons : ${snapshot.milestones.map((m) => `${m.done ? '[fait]' : '[à faire]'} $
     ? snapshot.recentRuns.map((r) => `- ${r.protocol_id} le ${new Date(r.ran_at).toLocaleDateString('fr-FR')} sur "${r.sujet || '?'}"${r.revisited ? ' (déjà réévalué)' : ''}`).join('\n')
     : 'Aucun protocole conduit récemment.';
 
+  const filRouge = snapshot.insights.length > 0
+    ? snapshot.insights
+        .map((i) => `- « ${i.idee} » (${i.source})${i.transmise_le ? ' — déjà transmise' : ' — pas encore transmise'}`)
+        .join('\n')
+    : 'Aucune idée retenue pour l\'instant.';
+
+  const passages = params.ragPassages.length > 0
+    ? params.ragPassages.map((p) => `[${p.livre}] ${p.content.slice(0, 500)}`).join('\n\n')
+    : 'Aucun passage remonté (bibliothèque vide ou recherche indisponible).';
+
   return `## Personne : ${params.userName}
 
 ## Son parcours aujourd'hui
@@ -80,6 +92,12 @@ ${runsState}
 
 ## Protocoles PNL existants (pour identifier celui qui a été conduit)
 ${buildProtocolCatalog()}
+
+## Le fil rouge actuel (idées déjà retenues de ses livres)
+${filRouge}
+
+## Passages remontés de sa bibliothèque, cherchés sur son travail
+${passages}
 
 ## La séance à dépouiller
 ${params.conversation}
@@ -112,7 +130,11 @@ ${params.conversation}
     "intensite_apres": 4,
     "revisit_in_days": 7
   },
-  "protocols_revisited": [{"protocol_id": "id", "note": "ce que le retest a donné"}]
+  "protocols_revisited": [{"protocol_id": "id", "note": "ce que le retest a donné"}],
+  "book_insights": [
+    {"source": "Titre — Auteur", "idee": "l'idée en une phrase, dans un français simple", "pourquoi": "pourquoi elle parle à CETTE personne, vu cette séance", "comment_utiliser": "à quel moment le coach la sortira", "theme": "le thème auquel elle se rattache"}
+  ],
+  "insights_transmitted": ["l'idée du fil rouge que le coach a RÉELLEMENT donnée dans cette séance"]
 }
 
 Contraintes :
@@ -121,13 +143,39 @@ Contraintes :
 - "measure_readings" : uniquement si elle a donné un chiffre (ou l'équivalent explicite) pendant la séance, sur une mesure qui EXISTE déjà.
 - "practices_new" : 0 à 2 maximum. Mieux vaut une pratique tenue que trois abandonnées.
 - "protocol_run" : null si aucun protocole n'a été conduit. "revisit_in_days" = 7 par défaut, 3 pour un ancrage, 14 pour un travail de croyance.
-- "cadence" ∈ daily | weekdays | weekly.`;
+- "cadence" ∈ daily | weekdays | weekly.
+- "book_insights" : 0 à 2, et 0 est la bonne réponse la plupart du temps. Tu ne retiens une idée QUE si trois conditions sont réunies : elle sort des passages fournis, elle éclaire précisément ce que cette séance a montré, et elle n'est pas déjà dans le fil rouge. Une idée générique de développement personnel n'a rien à faire ici. Formule-la en une phrase qu'on pourrait dire à voix haute, pas en jargon de livre.
+- "insights_transmitted" : reprends mot pour mot l'idée du fil rouge que le coach a effectivement transmise dans la séance. Tableau vide s'il n'en a donné aucune — c'est le cas courant.`;
+}
+
+/**
+ * La requête envoyée à la bibliothèque porte sur le TRAVAIL de la personne —
+ * son objectif, ses croyances, ses thèmes — pas sur sa dernière phrase. Une
+ * recherche sur une phrase isolée remonte ce qui sonne pareil ; une recherche
+ * sur le travail remonte ce qui sert.
+ */
+export function buildLibraryQuery(
+  snapshot: CoachingSnapshot,
+  profile: { croyances_limitantes: string[]; patterns_sabotage: string[] },
+  themes: string[] = []
+): string {
+  const bits = [
+    snapshot.program?.objectif,
+    snapshot.program?.etat_present,
+    ...profile.croyances_limitantes.slice(0, 2),
+    ...profile.patterns_sabotage.slice(0, 2),
+    ...themes.slice(0, 3),
+  ].filter((b): b is string => Boolean(b && b.trim()));
+
+  return bits.join('. ').slice(0, 900);
 }
 
 export async function extractHarvest(params: {
   userName: string;
   messages: Message[];
   snapshot: CoachingSnapshot;
+  /** Passages remontés de sa bibliothèque, cherchés sur SON travail. */
+  ragPassages?: Array<{ livre: string; content: string }>;
 }): Promise<SessionHarvest> {
   const empty: SessionHarvest = {
     program: null,
@@ -138,6 +186,8 @@ export async function extractHarvest(params: {
     practices_new: [],
     protocol_run: null,
     protocols_revisited: [],
+    book_insights: [],
+    insights_transmitted: [],
   };
 
   const conversation = params.messages
@@ -154,7 +204,12 @@ export async function extractHarvest(params: {
       messages: [
         {
           role: 'user',
-          content: buildHarvestUserPrompt({ userName: params.userName, conversation, snapshot: params.snapshot }),
+          content: buildHarvestUserPrompt({
+            userName: params.userName,
+            conversation,
+            snapshot: params.snapshot,
+            ragPassages: params.ragPassages || [],
+          }),
         },
       ],
     });
@@ -177,6 +232,8 @@ export async function extractHarvest(params: {
       practices_new: normalizePractices(parsed.practices_new),
       protocol_run: normalizeRun(parsed.protocol_run),
       protocols_revisited: normalizeRevisited(parsed.protocols_revisited),
+      book_insights: normalizeInsights(parsed.book_insights),
+      insights_transmitted: stringArray(parsed.insights_transmitted, 3),
     };
   } catch (error) {
     console.error('Harvest extraction error:', error);
@@ -196,6 +253,8 @@ export interface HarvestResult {
   practices_added: number;
   protocol_logged: boolean;
   protocols_revisited: number;
+  insights_added: number;
+  insights_transmitted: number;
 }
 
 export async function applyHarvest(
@@ -215,6 +274,8 @@ export async function applyHarvest(
     practices_added: 0,
     protocol_logged: false,
     protocols_revisited: 0,
+    insights_added: 0,
+    insights_transmitted: 0,
   };
 
   let programId = snapshot.program?.id ?? null;
@@ -406,6 +467,46 @@ export async function applyHarvest(
     else result.protocol_logged = true;
   }
 
+  // ── Le fil rouge ──────────────────────────────────────────────────────────
+  // D'abord ce qui a été transmis : une idée déjà donnée ne doit plus être
+  // présentée comme neuve, sinon le coach radote.
+  for (const transmise of harvest.insights_transmitted) {
+    const match = snapshot.insights.find((i) => looseMatch(i.idee, transmise));
+    if (!match) continue;
+    const { error } = await supabase
+      .from('coach_insights')
+      .update({
+        transmise_le: match.transmise_le ?? new Date().toISOString(),
+        fois_utilisee: match.fois_utilisee + 1,
+      })
+      .eq('id', match.id);
+    if (!error) result.insights_transmitted++;
+  }
+
+  const roomForInsights = Math.max(0, MAX_INSIGHTS - snapshot.insights.length);
+  if (roomForInsights > 0 && harvest.book_insights.length > 0) {
+    const existing = snapshot.insights.map((i) => norm(i.idee));
+    const toAdd = harvest.book_insights
+      .filter((i) => !existing.some((e) => looseMatch(e, i.idee)))
+      .slice(0, roomForInsights);
+
+    if (toAdd.length > 0) {
+      const { error } = await supabase.from('coach_insights').insert(
+        toAdd.map((i) => ({
+          user_id: userId,
+          program_id: programId,
+          source: i.source,
+          idee: i.idee,
+          pourquoi: i.pourquoi,
+          comment_utiliser: i.comment_utiliser,
+          theme: i.theme,
+        }))
+      );
+      if (error) console.warn('Harvest: insights insert failed:', error.message);
+      else result.insights_added = toAdd.length;
+    }
+  }
+
   // ── Protocoles réévalués ──────────────────────────────────────────────────
   for (const rev of harvest.protocols_revisited) {
     const match = snapshot.recentRuns.find((r) => !r.revisited && r.protocol_id === rev.protocol_id);
@@ -534,6 +635,27 @@ function normalizeRun(value: unknown): SessionHarvest['protocol_run'] {
     intensite_apres: intOrNull(r.intensite_apres, 0, 10),
     revisit_in_days: intOrNull(r.revisit_in_days, 1, 60),
   };
+}
+
+function normalizeInsights(value: unknown): SessionHarvest['book_insights'] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((raw) => {
+      if (!raw || typeof raw !== 'object') return null;
+      const i = raw as Record<string, unknown>;
+      const idee = text(i.idee);
+      const source = text(i.source);
+      if (!idee || !source) return null;
+      return {
+        source: source.slice(0, 160),
+        idee: idee.slice(0, 280),
+        pourquoi: text(i.pourquoi),
+        comment_utiliser: text(i.comment_utiliser),
+        theme: text(i.theme),
+      };
+    })
+    .filter((i): i is SessionHarvest['book_insights'][number] => i !== null)
+    .slice(0, 2);
 }
 
 function normalizeRevisited(value: unknown): SessionHarvest['protocols_revisited'] {

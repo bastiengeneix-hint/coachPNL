@@ -18,10 +18,16 @@ export const MOVES = [
   'mirror',
   'observation',
   'metaphor',
-  'confrontation',
+  // Remplace 'confrontation' : on renvoie à la personne l'écart entre ce qu'elle
+  // veut et ce qu'elle fait, avec SES mots, sans jugement. Pousser contre la
+  // résistance la renforce — c'est le résultat le plus constant de la recherche
+  // sur le changement de comportement.
+  'discrepancy',
+  // Nommer une force ou un acte réel, précisément. Sous-utilisé et pourtant
+  // l'un des gestes les mieux étayés de l'entretien motivationnel.
+  'affirmation',
   'celebration',
   'silence',
-  'provocation',
   'personal_share',
   'zoom_out',
   'reframe',
@@ -38,10 +44,18 @@ export const LENGTHS = ['short', 'medium', 'long'] as const;
 export const TONES = ['warm', 'direct', 'playful', 'serious', 'tender'] as const;
 export const RISKS = ['none', 'detresse', 'crise'] as const;
 
+/**
+ * Ce que la personne exprime en ce moment. C'est le signal le mieux établi de
+ * toute la recherche sur le changement de comportement : quand quelqu'un
+ * s'entend formuler ses propres raisons de changer, il change. Quand on les
+ * formule à sa place, il défend le statu quo.
+ */
+export const CHANGE_TALK = ['changement', 'statu_quo', 'mixte', 'aucun'] as const;
+
 export type CoachingMove = (typeof MOVES)[number];
 
-/** Gestes qui bousculent. Jamais deux d'affilée : sinon c'est un interrogatoire. */
-const HARD_MOVES: CoachingMove[] = ['confrontation', 'provocation', 'accountability'];
+/** Gestes qui poussent. Jamais deux d'affilée : sinon c'est un interrogatoire. */
+const HARD_MOVES: CoachingMove[] = ['discrepancy', 'accountability'];
 
 export interface CoachingStrategy {
   /** Quel mouvement de coaching jouer dans ce message. */
@@ -54,6 +68,8 @@ export interface CoachingStrategy {
   emotion_intensity: number;
   /** Ce qui se dit sous les mots. */
   subtext: string;
+  /** Discours-changement ou discours de statu quo : décide si on pousse ou pas. */
+  change_talk: (typeof CHANGE_TALK)[number];
   /** Protocole PNL à conduire, et où on en est dedans. */
   protocol: ProtocolId | null;
   protocol_step: number;
@@ -76,7 +92,7 @@ export interface CoachingStrategy {
 
 const STRATEGY_SYSTEM_PROMPT = `Tu es le superviseur de séance d'un coach PNL. Tu ne parles JAMAIS au coaché — tu regardes la séance derrière la glace et tu donnes une consigne au coach pour son prochain message.
 
-Tu es expert en PNL (protocoles, Meta-Modèle, calibration), en coaching professionnel, en dynamique conversationnelle et en lecture émotionnelle.
+Tu es formé à l'entretien motivationnel, à la thérapie brève orientée solution, à la restructuration cognitive et aux protocoles PNL qui tiennent debout. Ton cadre de référence par défaut est l'entretien motivationnel : c'est l'approche dont les résultats sont les mieux établis, et c'est celle qui décide du rythme.
 
 Tes obsessions, dans cet ordre — l'ordre compte plus que la liste :
 1. COMPRENDRE ce qui se passe pour cette personne, maintenant. Tant que ce n'est pas clair, on écoute. Un coach qui sait déjà quoi dire n'écoute plus.
@@ -168,12 +184,13 @@ ${params.protocolCatalog}
 
 ## RÉPONDS EN JSON, STRUCTURE EXACTE
 {
-  "move": "mirror|observation|metaphor|confrontation|celebration|silence|provocation|personal_share|zoom_out|reframe|teach|protocol|exercise|accountability|program_setup",
+  "move": "mirror|observation|metaphor|discrepancy|affirmation|celebration|silence|personal_share|zoom_out|reframe|teach|protocol|exercise|accountability|program_setup",
   "length": "short|medium|long",
   "tone": "warm|direct|playful|serious|tender",
   "user_emotion": "l'émotion principale (1-3 mots)",
   "emotion_intensity": 1,
   "subtext": "ce qui se dit SOUS les mots, ce que ${params.userName} n'ose pas dire (1 phrase)",
+  "change_talk": "changement|statu_quo|mixte|aucun",
   "protocol": "id du protocole à conduire, ou null",
   "protocol_step": 1,
   "session_goal": "ce que ${params.userName} cherche à obtenir de cette séance, dans ses mots — \\"\\" si pas encore clair",
@@ -213,11 +230,22 @@ SUIVI — utile, mais il ne conduit pas la séance
 15. En phase "cloture", un pas concret est souhaitable — pas obligatoire. Une séance où quelqu'un s'est senti compris n'est pas une séance ratée.
 16. Jamais de point de suivi si risk ≠ "none" ou si emotion_intensity ≥ 4. On ne demande pas un chiffre à quelqu'un qui pleure.
 
+DISCOURS-CHANGEMENT — la règle qui prime sur le reste du rythme
+16a. "change_talk" : qu'est-ce que la personne vient d'exprimer ?
+  - "changement" : elle dit son envie, sa capacité, ses raisons, son besoin, ou elle s'engage ("j'aimerais", "je pourrais", "il faut que je", "je vais").
+  - "statu_quo" : elle défend l'immobilité, se justifie, explique pourquoi c'est impossible, ou renvoie la faute ailleurs.
+  - "mixte" : les deux dans le même message. C'est de l'ambivalence, et c'est bon signe.
+16b. Si change_talk = "changement" : tu FAIS PARLER davantage. move = "mirror" ou une question ouverte qui creuse ("qu'est-ce qui te fait dire ça ?", "ça ressemblerait à quoi ?"). C'est en s'entendant le dire que quelqu'un change. Surtout ne pas féliciter ni conclure à sa place : ça referme.
+16c. Si change_talk = "statu_quo" : tu NE POUSSES PAS. Aucun "oui mais", aucun argument, aucune demande de comptes. Tu reflètes ce qui est dit, sans ironie, jusqu'au bout — et tu laisses l'autre versant apparaître tout seul. Pousser contre le statu quo le renforce, c'est mécanique.
+16d. Si change_talk = "mixte" : c'est le moment de l'ambivalence. protocol = "parties_en_conflit" ou reflet des deux versants dans la même phrase ("d'un côté… de l'autre…"). Tu ne choisis pas le camp du changement.
+
 RYTHME ET JUSTESSE
-16b. "confrontation", "provocation" et "accountability" sont des gestes DURS. Jamais deux d'affilée : regarde le mouvement précédent indiqué plus haut. Après un geste dur, on reçoit ce qui revient (mirror, observation, silence).
-16c. Une confrontation exige une preuve : une contradiction visible dans SES mots, dans cette séance. Sans preuve citable, ce n'est pas une confrontation, c'est un jugement — choisis autre chose.
-16d. "tone" : "warm" par défaut. "direct" seulement quand la personne tourne en rond depuis plusieurs messages ou demande explicitement de la franchise. Trois messages directs d'affilée, c'est une engueulade, pas un coaching.
-16e. "length" : "short" pour un miroir, un silence, une observation qui doit résonner. "medium" dès qu'on explore ou qu'on explique — c'est le cas le plus fréquent en phase exploration et travail.
+16e. "discrepancy" et "accountability" sont les deux gestes qui POUSSENT. Jamais deux d'affilée : regarde le mouvement précédent indiqué plus haut. Après, on reçoit ce qui revient (mirror, observation, silence).
+16f. "discrepancy" exige une preuve : deux choses que la personne a dites ELLE-MÊME et qui ne vont pas ensemble, citables dans cette séance. On renvoie l'écart, on ne le juge pas : "tu me dis que c'est ta priorité, et que tu l'as repoussé trois fois cette semaine. Tu en fais quoi, toi, de cet écart ?" Sans citation possible, ce n'est pas une divergence, c'est un reproche — choisis autre chose.
+16g. "affirmation" : nomme un acte ou une qualité RÉELS et précis, tirés de ce qu'elle vient de dire. Jamais "bravo", jamais "c'est super". "T'as relancé alors que t'avais peur de déranger" — ça, ça tient. Utilise-le plus souvent que tu ne le penses, surtout quand ça coince.
+16h. "tone" : "warm" par défaut. "direct" seulement si la personne tourne en rond depuis plusieurs messages ou demande explicitement de la franchise. Trois messages directs d'affilée, c'est une engueulade.
+16i. "length" : "short" pour un reflet, un silence, une observation qui doit résonner. "medium" dès qu'on explore ou qu'on explique — le cas le plus fréquent.
+16j. AUTONOMIE : la décision appartient toujours à la personne, et ça doit s'entendre. Jamais "tu dois", "il faut que tu". Les propositions se formulent comme des propositions.
 
 PERTINENCE
 17. "user_words" : recopie ses formulations EXACTES, pas des synonymes. C'est ce qui fait que le coach parle sa langue.
@@ -266,6 +294,7 @@ export function openingStrategy(mode: 'deblocage' | 'journal'): CoachingStrategy
     user_emotion: 'inconnu',
     emotion_intensity: 2,
     subtext: '',
+    change_talk: 'aucun',
     protocol: null,
     protocol_step: 1,
     session_goal: '',
@@ -316,6 +345,7 @@ export async function getCoachingStrategy(params: {
     user_emotion: 'inconnu',
     emotion_intensity: localRisk === 'none' ? 2 : 5,
     subtext: '',
+    change_talk: 'aucun',
     protocol: null,
     protocol_step: 1,
     session_goal: '',
@@ -429,6 +459,7 @@ export async function getCoachingStrategy(params: {
           ? clampInt(parsed.emotion_intensity, 1, 5, 2)
           : Math.max(4, clampInt(parsed.emotion_intensity, 1, 5, 5)),
       subtext: asText(parsed.subtext, ''),
+      change_talk: oneOf(parsed.change_talk, CHANGE_TALK, 'aucun'),
       protocol: safeProtocol,
       protocol_step: clampInt(parsed.protocol_step, 1, 12, 1),
       session_goal: asText(parsed.session_goal, ''),

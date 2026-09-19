@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/types';
 import type {
   Checkin,
+  CoachInsight,
   CoachingSnapshot,
   Measure,
   MeasureEntry,
@@ -82,6 +83,7 @@ export async function getCoachingSnapshot(
     runsRes,
     checkinsRes,
     sessionsRes,
+    insightsRes,
   ] = await Promise.all([
     supabase.from('programs').select('*').eq('user_id', userId).eq('statut', 'actif').limit(1),
     supabase.from('measures').select('*').eq('user_id', userId).eq('active', true).order('created_at'),
@@ -89,6 +91,7 @@ export async function getCoachingSnapshot(
     supabase.from('protocol_runs').select('*').eq('user_id', userId).gte('ran_at', since120).order('ran_at', { ascending: false }),
     supabase.from('checkins').select('*').eq('user_id', userId).gte('day', since30).order('day', { ascending: false }),
     supabase.from('sessions').select('date, actions').eq('user_id', userId).gte('date', since14).order('date', { ascending: false }).limit(10),
+    supabase.from('coach_insights').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(8),
   ]);
 
   const programRow = programRes.data?.[0] ?? null;
@@ -275,8 +278,25 @@ export async function getCoachingSnapshot(
 
   const lastSessionDate = (sessionsRes.data || [])[0]?.date ?? null;
 
+  // Le fil rouge : les idées pas encore transmises d'abord, c'est ce que le
+  // coach doit avoir sous la main.
+  const insights: CoachInsight[] = (insightsRes.data || [])
+    .map((i) => ({
+      id: i.id,
+      source: i.source,
+      idee: i.idee,
+      pourquoi: i.pourquoi,
+      comment_utiliser: i.comment_utiliser,
+      theme: i.theme,
+      transmise_le: i.transmise_le,
+      fois_utilisee: i.fois_utilisee,
+      created_at: i.created_at,
+    }))
+    .sort((a, b) => Number(a.transmise_le !== null) - Number(b.transmise_le !== null));
+
   return {
     program,
+    insights,
     milestones,
     measures,
     practices,
@@ -321,6 +341,11 @@ function daysSinceLastDone(doneDays: Set<string>): number {
 /**
  * Jours attendus consécutifs cochés. La journée en cours ne casse pas la série
  * si elle n'est pas encore faite : on ne punit personne à 9 h du matin.
+ *
+ * À lire avec prudence côté affichage : une habitude se construit par
+ * répétition sur la durée, et une journée manquée ne casse rien du tout. Un
+ * compteur de série, lui, transforme un jour raté en échec total et fait tout
+ * lâcher. On calcule la série, on affiche la RÉGULARITÉ.
  */
 function computeStreak(cadence: PracticeCadence, doneDays: Set<string>): number {
   if (cadence === 'weekly') {

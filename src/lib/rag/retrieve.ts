@@ -66,7 +66,8 @@ async function embedQuery(query: string): Promise<number[]> {
 // Recherche vectorielle dans Supabase pgvector
 export async function retrievePassages(
   userMessage: string,
-  recentMessages: string[] = []
+  recentMessages: string[] = [],
+  maxPassages = 9
 ): Promise<RAGPassage[]> {
   // Pas de retrieval sur messages très courts
   if (userMessage.length < 15) return [];
@@ -92,7 +93,7 @@ export async function retrievePassages(
     const { data: chunks, error } = await supabase.rpc('match_chunks', {
       query_embedding: JSON.stringify(embedding),
       match_threshold: 0.72,
-      match_count: 9,
+      match_count: Math.max(maxPassages, 6),
     });
 
     if (error || !chunks || chunks.length === 0) return [];
@@ -135,7 +136,7 @@ export async function retrievePassages(
       }
     }
 
-    return passages.slice(0, 9);
+    return passages.slice(0, maxPassages);
   } catch (error) {
     console.error('RAG retrieval error:', error);
     return [];
