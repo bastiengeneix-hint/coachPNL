@@ -57,6 +57,14 @@ export type CoachingMove = (typeof MOVES)[number];
 /** Gestes qui poussent. Jamais deux d'affilée : sinon c'est un interrogatoire. */
 const HARD_MOVES: CoachingMove[] = ['discrepancy', 'accountability'];
 
+/**
+ * Gestes d'écoute : eux peuvent se suivre sans lasser — deux reflets d'affilée,
+ * c'est même souvent ce qu'il faut. Tous les autres, répétés, donnent
+ * l'impression d'un disque rayé (vu en prod : trois propositions d'exercice en
+ * trois messages).
+ */
+const LISTENING_MOVES: CoachingMove[] = ['mirror', 'observation', 'silence'];
+
 export interface CoachingStrategy {
   /** Quel mouvement de coaching jouer dans ce message. */
   move: CoachingMove;
@@ -240,6 +248,7 @@ DISCOURS-CHANGEMENT — la règle qui prime sur le reste du rythme
 16d. Si change_talk = "mixte" : c'est le moment de l'ambivalence. protocol = "parties_en_conflit" ou reflet des deux versants dans la même phrase ("d'un côté… de l'autre…"). Tu ne choisis pas le camp du changement.
 
 RYTHME ET JUSTESSE
+16d-bis. Tu ne rejoues JAMAIS le mouvement précédent (indiqué plus haut), sauf s'il s'agit d'écouter (mirror, observation, silence). Proposer deux fois le même exercice, deux fois le même enseignement, c'est le meilleur moyen de faire décrocher quelqu'un. S'il a décliné une proposition, tu ne la representes pas autrement : tu l'écoutes.
 16e. "discrepancy" et "accountability" sont les deux gestes qui POUSSENT. Jamais deux d'affilée : regarde le mouvement précédent indiqué plus haut. Après, on reçoit ce qui revient (mirror, observation, silence).
 16f. "discrepancy" exige une preuve : deux choses que la personne a dites ELLE-MÊME et qui ne vont pas ensemble, citables dans cette séance. On renvoie l'écart, on ne le juge pas : "tu me dis que c'est ta priorité, et que tu l'as repoussé trois fois cette semaine. Tu en fais quoi, toi, de cet écart ?" Sans citation possible, ce n'est pas une divergence, c'est un reproche — choisis autre chose.
 16g. "affirmation" : nomme un acte ou une qualité RÉELS et précis, tirés de ce qu'elle vient de dire. Jamais "bravo", jamais "c'est super". "T'as relancé alors que t'avais peur de déranger" — ça, ça tient. Utilise-le plus souvent que tu ne le penses, surtout quand ça coince.
@@ -423,6 +432,16 @@ export async function getCoachingStrategy(params: {
       params.previousMove &&
       HARD_MOVES.includes(params.previousMove) &&
       HARD_MOVES.includes(move)
+    ) {
+      move = 'mirror';
+    }
+
+    // Le même geste deux fois de suite, c'est un disque rayé — sauf s'il s'agit
+    // d'écouter, où l'insistance est une qualité.
+    if (
+      params.previousMove &&
+      params.previousMove === move &&
+      !LISTENING_MOVES.includes(move)
     ) {
       move = 'mirror';
     }

@@ -72,8 +72,13 @@ export function computeSessionArc(params: {
 }
 
 function pickPhase(exchanges: number, minutes: number, budget: number): SessionPhase {
-  // Le temps peut faire basculer plus vite que le nombre d'échanges (silences longs).
-  const timePressure = minutes >= 45 * budget ? 'cloture' : minutes >= 32 * budget ? 'atterrissage' : null;
+  // Le temps peut faire basculer plus vite que le nombre d'échanges (silences
+  // longs). Mais il ne doit pas EMPORTER la séance : une séance reprise garde
+  // son horloge de départ, et quelqu'un qui parle encore au bout d'une heure
+  // n'a pas besoin d'un coach qui essaie de refermer à chaque message. Vu en
+  // prod : 50 minutes de conversation entièrement passées en « clôture », avec
+  // une proposition d'exercice tous les deux messages.
+  const timePressure = minutes >= 75 * budget ? 'cloture' : minutes >= 50 * budget ? 'atterrissage' : null;
 
   const byExchanges: SessionPhase =
     exchanges <= 1 ? 'ouverture'
@@ -83,7 +88,11 @@ function pickPhase(exchanges: number, minutes: number, budget: number): SessionP
     : exchanges <= Math.round(16 * budget) ? 'atterrissage'
     : 'cloture';
 
-  if (timePressure === 'cloture') return 'cloture';
+  // Le décompte des échanges prime : si la personne en est encore à explorer,
+  // le chronomètre ne la met pas dehors.
+  if (timePressure === 'cloture' && byExchanges !== 'ouverture' && byExchanges !== 'cadrage') {
+    return byExchanges === 'exploration' ? 'travail' : 'cloture';
+  }
   if (timePressure === 'atterrissage' && byExchanges !== 'cloture') {
     return byExchanges === 'ouverture' || byExchanges === 'cadrage' ? byExchanges : 'atterrissage';
   }
