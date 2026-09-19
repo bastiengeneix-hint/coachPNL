@@ -264,21 +264,45 @@ export async function POST(req: NextRequest) {
 
     const anthropic = new Anthropic({ apiKey: getAnthropicKey() });
 
-    const response = await anthropic.messages.create({
-      model: COACH_MODEL,
-      max_tokens: MAX_TOKENS_BY_LENGTH[strategy.length] ?? 800,
-      system: [
-        { type: 'text', text: stable, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: contextual },
-      ],
-      messages: apiMessages,
-    });
+    const callCoach = () =>
+      anthropic.messages.create({
+        model: COACH_MODEL,
+        max_tokens: MAX_TOKENS_BY_LENGTH[strategy.length] ?? 800,
+        system: [
+          { type: 'text', text: stable, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: contextual },
+        ],
+        messages: apiMessages,
+      });
+
+    // Un hoquet de l'API ne doit pas couper une conversation en cours : on
+    // réessaie une fois sur les erreurs transitoires (surcharge, limite de
+    // débit, coupure réseau). Au-delà, on remonte l'erreur.
+    let response;
+    try {
+      response = await callCoach();
+    } catch (firstError) {
+      const status = (firstError as { status?: number }).status;
+      const transient = status === undefined || status === 429 || (status >= 500 && status < 600);
+      if (!transient) throw firstError;
+
+      console.warn(`Coach: retry after transient error (status=${status ?? 'network'})`);
+      await new Promise((r) => setTimeout(r, 700));
+      response = await callCoach();
+    }
 
     // 13. Extract text response
     const textContent = response.content.find((block) => block.type === 'text');
     const messageText = textContent ? textContent.text : '';
 
     if (!messageText) {
+      // Ce chemin ne journalisait rien : deux 500 en prod sont restés
+      // indiagnosticables. On dit ce qu'on a reçu.
+      console.error(
+        `Coach: empty response. stop_reason=${response.stop_reason} blocks=${response.content
+          .map((b) => b.type)
+          .join(',')} max_tokens=${MAX_TOKENS_BY_LENGTH[strategy.length] ?? 800} len=${strategy.length}`
+      );
       return NextResponse.json(
         { error: 'Le coach n\'a pas pu générer de réponse. Réessaye.' },
         { status: 500 }
@@ -299,7 +323,8 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Coach API error:', error);
+    const status = (error as { status?: number }).status;
+    console.error(`Coach API error (status=${status ?? 'n/a'}):`, error);
     const message = error instanceof Error ? error.message : 'Erreur interne du serveur';
     return NextResponse.json(
       { error: message },
