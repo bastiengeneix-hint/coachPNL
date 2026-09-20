@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/auth-options';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildSystemPromptParts } from '@/lib/prompts/system-prompt';
 import { getCoachingStrategy, openingStrategy, MOVES, type CoachingMove } from '@/lib/prompts/strategy-agent';
+import { PROTOCOL_IDS, type ProtocolId } from '@/lib/pnl/protocols';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { COACH_MODEL } from '@/lib/ai/models';
@@ -26,6 +27,10 @@ function isCoachingMove(value: unknown): value is CoachingMove {
   return typeof value === 'string' && (MOVES as readonly string[]).includes(value);
 }
 
+function isProtocolId(value: unknown): value is ProtocolId {
+  return typeof value === 'string' && (PROTOCOL_IDS as readonly string[]).includes(value);
+}
+
 const MAX_TOKENS_BY_LENGTH: Record<string, number> = {
   short: 400,
   medium: 800,
@@ -41,7 +46,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { messages, mode, isFirstMessage, startedAt, previousMove } = await req.json();
+    const { messages, mode, isFirstMessage, startedAt, previousMove, activeProtocol, activeProtocolStep } =
+      await req.json();
 
     // 3. Create Supabase client
     const supabase = createServerClient();
@@ -210,6 +216,12 @@ export async function POST(req: NextRequest) {
           agenda,
           agendaAllowed,
           previousMove: isCoachingMove(previousMove) ? previousMove : null,
+          // Le protocole en cours est porté par le client : le serveur est sans
+          // état, et le superviseur ne doit plus le redeviner à chaque tour.
+          activeProtocol: isProtocolId(activeProtocol) ? activeProtocol : null,
+          activeProtocolStep: Number.isFinite(Number(activeProtocolStep))
+            ? Math.min(12, Math.max(1, Math.round(Number(activeProtocolStep))))
+            : 1,
         });
 
     console.log(

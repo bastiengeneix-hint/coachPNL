@@ -44,6 +44,9 @@ function SessionContent() {
   // rappelle ce que le coach vient de jouer, pour qu'il n'enchaîne pas deux
   // gestes durs (confrontation, demande de comptes) d'affilée.
   const previousMoveRef = useRef<string | null>(null);
+  // Idem pour le protocole en cours : sans ça le superviseur repart de zéro à
+  // chaque message et papillonne d'un protocole à l'autre sans en finir aucun.
+  const activeProtocolRef = useRef<{ id: string | null; step: number }>({ id: null, step: 1 });
 
   // Keep sessionRef in sync
   useEffect(() => {
@@ -144,6 +147,10 @@ function SessionContent() {
         throw new Error(data.error || 'Failed to get coach response');
       }
       previousMoveRef.current = data.meta?.move ?? null;
+      activeProtocolRef.current = {
+        id: data.meta?.protocol ?? null,
+        step: data.meta?.protocol_step ?? 1,
+      };
 
       const updatedSession = addMessage(newSession, 'coach', data.message);
       setSession(updatedSession);
@@ -189,6 +196,8 @@ function SessionContent() {
           // pour savoir s'il ouvre encore ou s'il doit faire atterrir.
           startedAt: withUserMsg.messages[0]?.timestamp ?? null,
           previousMove: previousMoveRef.current,
+          activeProtocol: activeProtocolRef.current.id,
+          activeProtocolStep: activeProtocolRef.current.step,
         }),
       });
 
@@ -198,6 +207,10 @@ function SessionContent() {
         throw new Error(data.error || 'Failed to get coach response');
       }
       previousMoveRef.current = data.meta?.move ?? null;
+      activeProtocolRef.current = {
+        id: data.meta?.protocol ?? null,
+        step: data.meta?.protocol_step ?? 1,
+      };
 
       const finalSession = addMessage(withUserMsg, 'coach', data.message);
       setSession(finalSession);
