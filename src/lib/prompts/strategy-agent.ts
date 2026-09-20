@@ -175,6 +175,13 @@ ${
 ## Mouvement du message précédent du coach
 ${params.previousMove ?? 'aucun (début de séance)'}
 
+## Protocole réellement en cours
+${
+  params.activeProtocol
+    ? `${params.activeProtocol}, étape ${params.activeProtocolStep}. C'est un FAIT, pas une supposition : le coach a conduit cette étape au message précédent. Tu continues CE protocole — étape suivante si la réponse est claire, même étape si elle est vague. Tu n'en changes que si la personne a décroché ou changé de sujet, et dans ce cas protocol = null (pas un autre protocole).`
+    : "aucun. Tu peux en lancer un si le moment s'y prête vraiment — mais un protocole effleuré puis abandonné ne produit rien. N'en lance un que si tu penses pouvoir le conduire sur plusieurs messages."
+}
+
 ## Phase de la séance : ${params.phase} — ${params.exchangeCount} échange(s), ${params.elapsedMinutes} min écoulées
 ${params.shouldLand ? 'ON REFERME : plus aucun sujet nouveau, il faut du concret avant la fin.' : 'On a encore du temps devant nous.'}
 
@@ -219,7 +226,7 @@ SÉCURITÉ (prioritaire sur tout le reste)
 
 PROTOCOLE
 2. Tu ne lances un protocole que si : le vrai sujet est identifié, l'intensité émotionnelle est ≤ 3, et la phase est "exploration", "travail" ou "atterrissage". Sinon protocol = null.
-3. Si la transcription montre qu'un protocole est DÉJÀ en cours (le coach a commencé à guider une séquence), tu gardes le MÊME protocole et tu incrémentes protocol_step. Tu ne recommences pas à l'étape 1 et tu ne changes pas de protocole en cours de route.
+3. Le protocole en cours t'est donné plus haut : ce n'est plus à toi de le deviner. Tu gardes le MÊME et tu avances d'une étape, ou tu refais la même étape. Jamais de retour en arrière, jamais de changement de protocole en cours de séance. Relevé en prod : cinq protocoles commencés et aucun conduit sur une séance de deux heures — c'est le défaut qui coûte le plus.
 4. Si sa réponse à l'étape en cours est vague ou à côté, tu gardes le même protocol_step : on refait l'étape.
 5. Si elle décroche, s'agace, ou change de sujet : protocol = null. La personne passe avant la technique.
 6. En phase "cloture", si un insight est sorti mais qu'aucune action concrète n'a été prise, protocol = "pont_vers_futur".
@@ -289,6 +296,9 @@ interface StrategyParams {
   agendaAllowed: boolean;
   /** Mouvement du message précédent du coach, pour ne pas enchaîner deux gestes durs. */
   previousMove: CoachingMove | null;
+  /** Protocole réellement en cours, et où il en est. Transmis par le client. */
+  activeProtocol: ProtocolId | null;
+  activeProtocolStep: number;
 }
 
 /**
@@ -343,6 +353,8 @@ export async function getCoachingStrategy(params: {
   agenda: string[];
   agendaAllowed: boolean;
   previousMove: CoachingMove | null;
+  activeProtocol: ProtocolId | null;
+  activeProtocolStep: number;
 }): Promise<CoachingStrategy> {
   // Filet local : il prime toujours, même si l'appel au superviseur tombe.
   const localRisk = screenRisk(params.userMessage);
@@ -395,6 +407,8 @@ export async function getCoachingStrategy(params: {
             agenda: params.agenda,
             agendaAllowed: params.agendaAllowed,
             previousMove: params.previousMove,
+            activeProtocol: params.activeProtocol,
+            activeProtocolStep: params.activeProtocolStep,
           }),
         },
       ],
@@ -407,13 +421,43 @@ export async function getCoachingStrategy(params: {
     if (!parsed) return defaultStrategy;
 
     const risk = mergeRisk(localRisk, oneOf(parsed.risk, RISKS, 'none'));
+    const changeTalk = oneOf(parsed.change_talk, CHANGE_TALK, 'aucun');
+    const emotionIntensity =
+      risk === 'none'
+        ? clampInt(parsed.emotion_intensity, 1, 5, 2)
+        : Math.max(4, clampInt(parsed.emotion_intensity, 1, 5, 5));
     const protocolRaw = typeof parsed.protocol === 'string' ? parsed.protocol : null;
     const protocol = protocolRaw && (PROTOCOL_IDS as string[]).includes(protocolRaw)
       ? (protocolRaw as ProtocolId)
       : null;
 
     // En détresse ou en crise, aucun protocole ne tient : la personne d'abord.
-    const safeProtocol = risk === 'none' ? protocol : null;
+    let safeProtocol = risk === 'none' ? protocol : null;
+    let safeStep = clampInt(parsed.protocol_step, 1, 12, 1);
+
+    // Continuité du protocole. Le superviseur redécidait à chaque message et
+    // papillonnait (cinq protocoles effleurés en deux heures, avec des retours
+    // à l'étape 1). Ce qui est en cours fait foi.
+    if (params.activeProtocol && risk === 'none') {
+      const changeDeSujet = changeTalk === 'statu_quo' || emotionIntensity >= 4;
+
+      if (changeDeSujet) {
+        // La personne défend l'immobilité ou l'émotion monte : on lâche la
+        // technique, quelle que soit l'étape. Elle passe avant le protocole.
+        safeProtocol = null;
+      } else if (safeProtocol !== params.activeProtocol) {
+        // On ne saute pas d'un protocole à l'autre : on continue celui-là.
+        safeProtocol = params.activeProtocol;
+      }
+
+      if (safeProtocol === params.activeProtocol) {
+        // Jamais en arrière, jamais plus d'une étape à la fois.
+        safeStep = Math.min(
+          Math.max(safeStep, params.activeProtocolStep),
+          params.activeProtocolStep + 1
+        );
+      }
+    }
 
     // ── Garde-fous déterministes ────────────────────────────────────────
     // Le modèle a beau avoir la consigne, on ne laisse pas au hasard ce qui
@@ -473,14 +517,11 @@ export async function getCoachingStrategy(params: {
       user_emotion: asText(parsed.user_emotion, defaultStrategy.user_emotion),
       // En détresse ou en crise, l'intensité ne peut pas être basse : c'est elle
       // qui coupe les techniques dans le prompt du coach.
-      emotion_intensity:
-        risk === 'none'
-          ? clampInt(parsed.emotion_intensity, 1, 5, 2)
-          : Math.max(4, clampInt(parsed.emotion_intensity, 1, 5, 5)),
+      emotion_intensity: emotionIntensity,
       subtext: asText(parsed.subtext, ''),
-      change_talk: oneOf(parsed.change_talk, CHANGE_TALK, 'aucun'),
+      change_talk: changeTalk,
       protocol: safeProtocol,
-      protocol_step: clampInt(parsed.protocol_step, 1, 12, 1),
+      protocol_step: safeStep,
       session_goal: asText(parsed.session_goal, ''),
       user_words: stringArray(parsed.user_words, 5),
       follow_up: agendaItem !== null ? asText(parsed.follow_up, '') || null : null,
