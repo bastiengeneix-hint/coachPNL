@@ -10,6 +10,11 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS coach_summary TEXT;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS actions JSONB NOT NULL DEFAULT '[]';
 -- Sans `ended`, AUCUNE séance ne peut être sauvegardée (l'app l'écrit à chaque message).
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended BOOLEAN NOT NULL DEFAULT false;
+-- La lettre de séance, écrite à l'analyse, et quand elle a été envoyée par notification.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS lettre TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS lettre_envoyee_le TIMESTAMPTZ;
+-- Le retour de fin de séance : quatre notes de 0 à 10 (écoute, sujet, approche, global) + une note libre.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS feedback JSONB;
 
 CREATE TABLE IF NOT EXISTS exercise_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

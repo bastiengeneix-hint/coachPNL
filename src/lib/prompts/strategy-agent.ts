@@ -114,10 +114,12 @@ Ce que tu ne fais JAMAIS :
 
 Tu réponds UNIQUEMENT en JSON valide, sans markdown, sans explication.`;
 
+const TRANSCRIPT_WINDOW = 12;
+
 function buildTranscript(
   messages: Array<{ role: string; content: string }>,
   userName: string,
-  limit = 12
+  limit = TRANSCRIPT_WINDOW
 ): string {
   const recent = messages.slice(-limit);
   if (recent.length === 0) return 'Séance qui démarre, aucun échange encore.';
@@ -129,6 +131,23 @@ function buildTranscript(
       return `${who}: ${content}`;
     })
     .join('\n');
+}
+
+/**
+ * Ce que la personne a amené en ouvrant, quand c'est sorti de la fenêtre des
+ * derniers messages. Dans une séance longue, le superviseur ne voyait plus que
+ * la fin : le problème posé au début avait disparu de son champ.
+ */
+export function buildOpeningExcerpt(
+  messages: Array<{ role: string; content: string }>,
+  limit = TRANSCRIPT_WINDOW
+): string[] {
+  if (messages.length <= limit) return [];
+  return messages
+    .slice(0, messages.length - limit)
+    .filter((m) => m.role === 'user' && m.content.trim().length >= 40)
+    .slice(0, 2)
+    .map((m) => (m.content.length > 600 ? `${m.content.slice(0, 600)}…` : m.content));
 }
 
 function buildStrategyUserPrompt(params: StrategyParams): string {
@@ -185,6 +204,20 @@ ${
 ## Phase de la séance : ${params.phase} — ${params.exchangeCount} échange(s), ${params.elapsedMinutes} min écoulées
 ${params.shouldLand ? 'ON REFERME : plus aucun sujet nouveau, il faut du concret avant la fin.' : 'On a encore du temps devant nous.'}
 
+## Objectif de la séance déjà posé
+${
+  params.previousSessionGoal
+    ? `"${params.previousSessionGoal}" — c'est la formulation retenue aux messages précédents. Tu la recopies MOT POUR MOT dans "session_goal". Tu ne la changes que si ${params.userName} a explicitement changé de sujet ou de demande.`
+    : 'Pas encore posé.'
+}
+${
+  params.openingExcerpt.length > 0
+    ? `
+## Ce que ${params.userName} a amené en début de séance (sorti de la transcription ci-dessous)
+${params.openingExcerpt.map((m) => `${params.userName}: ${m}`).join('\n')}
+`
+    : ''
+}
 ## Transcription récente (dans l'ordre)
 ${params.transcript}
 
@@ -239,6 +272,7 @@ RYTHME
 
 SUIVI — utile, mais il ne conduit pas la séance
 11. "agenda_item" : le numéro du point à traiter dans CE message, ou null. Par défaut c'est **null**. Tu ne le remplis que si les trois conditions sont réunies : le bloc ci-dessus l'autorise, ce que la personne vient de dire n'est pas en train d'ouvrir quelque chose de vivant, et le point est vraiment lié au sujet du moment.
+11b. Exception : un point « RETOUR SUR LA DERNIÈRE SÉANCE » n'a pas besoin d'être lié au sujet du moment. La personne a dit que quelque chose n'a pas marché : tu le places dans la première moitié de la séance, dès que l'ordre du jour est autorisé et que le moment n'est pas chaud. Pas en "accountability" : c'est le coach qui rend des comptes, pas elle.
 12. Un point de suivi se glisse dans une conversation, il ne l'ouvre pas. Un seul par séance dans la plupart des cas. Si la transcription montre que le coach a déjà relancé sur le suivi, agenda_item = null.
 13. move = "accountability" UNIQUEMENT si agenda_item n'est pas null. Sinon ce mouvement n'a aucun sens.
 14. Aucun parcours défini : tu ne le poses PAS avant que le vrai sujet soit clair et que la personne se sente entendue — jamais avant la phase "travail". Alors seulement : move = "program_setup", protocol = "objectif_bien_forme".
@@ -299,13 +333,17 @@ interface StrategyParams {
   /** Protocole réellement en cours, et où il en est. Transmis par le client. */
   activeProtocol: ProtocolId | null;
   activeProtocolStep: number;
+  /** Objectif de séance retenu au message précédent ('' si pas encore posé). Transmis par le client. */
+  previousSessionGoal: string;
+  /** Messages d'ouverture sortis de la fenêtre de transcription. */
+  openingExcerpt: string[];
 }
 
 /**
  * Premier message d'une séance : il n'y a rien à analyser. On évite un appel au
  * superviseur (et le délai qui va avec, au moment où l'utilisateur attend le plus).
  */
-export function openingStrategy(mode: 'deblocage' | 'journal'): CoachingStrategy {
+export function openingStrategy(mode: 'deblocage' | 'journal', hasBridge = false): CoachingStrategy {
   return {
     move: mode === 'deblocage' ? 'observation' : 'mirror',
     length: 'short',
@@ -323,8 +361,11 @@ export function openingStrategy(mode: 'deblocage' | 'journal'): CoachingStrategy
     book_concept: null,
     avoid: [],
     should_ask_question: mode === 'journal',
-    specific_instruction:
-      mode === 'deblocage'
+    specific_instruction: hasBridge
+      ? mode === 'deblocage'
+        ? 'Une phrase de pont vers la dernière séance, sans rien demander, puis tu ouvres la porte et tu te tais. Deux phrases en tout.'
+        : 'Une phrase chaleureuse qui fait le pont avec la dernière séance, puis une seule question simple sur la journée.'
+      : mode === 'deblocage'
         ? "Ouvre la porte et tais-toi. Deux phrases maximum, aucune question fermée."
         : "Ouvre chaleureusement, avec une seule question simple sur la journée.",
     risk: 'none',
@@ -355,6 +396,7 @@ export async function getCoachingStrategy(params: {
   previousMove: CoachingMove | null;
   activeProtocol: ProtocolId | null;
   activeProtocolStep: number;
+  previousSessionGoal: string;
 }): Promise<CoachingStrategy> {
   // Filet local : il prime toujours, même si l'appel au superviseur tombe.
   const localRisk = screenRisk(params.userMessage);
@@ -369,7 +411,7 @@ export async function getCoachingStrategy(params: {
     change_talk: 'aucun',
     protocol: null,
     protocol_step: 1,
-    session_goal: '',
+    session_goal: params.previousSessionGoal,
     user_words: [],
     follow_up: null,
     agenda_item: null,
@@ -409,6 +451,8 @@ export async function getCoachingStrategy(params: {
             previousMove: params.previousMove,
             activeProtocol: params.activeProtocol,
             activeProtocolStep: params.activeProtocolStep,
+            previousSessionGoal: params.previousSessionGoal,
+            openingExcerpt: buildOpeningExcerpt(params.messages),
           }),
         },
       ],
@@ -522,7 +566,10 @@ export async function getCoachingStrategy(params: {
       change_talk: changeTalk,
       protocol: safeProtocol,
       protocol_step: safeStep,
-      session_goal: asText(parsed.session_goal, ''),
+      // Une fois posé, l'objectif ne s'évapore pas parce que le superviseur a
+      // rendu un champ vide : il était redeviné à chaque tour, faute d'être
+      // transmis d'un message à l'autre.
+      session_goal: asText(parsed.session_goal, params.previousSessionGoal),
       user_words: stringArray(parsed.user_words, 5),
       follow_up: agendaItem !== null ? asText(parsed.follow_up, '') || null : null,
       agenda_item: agendaItem,

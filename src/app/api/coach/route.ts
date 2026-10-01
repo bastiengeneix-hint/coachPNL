@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import Anthropic from '@anthropic-ai/sdk';
-import { buildSystemPromptParts } from '@/lib/prompts/system-prompt';
+import { buildSystemPromptParts, type SessionBridge } from '@/lib/prompts/system-prompt';
 import { getCoachingStrategy, openingStrategy, MOVES, type CoachingMove } from '@/lib/prompts/strategy-agent';
 import { PROTOCOL_IDS, type ProtocolId } from '@/lib/pnl/protocols';
 import { createServerClient } from '@/lib/supabase/server';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { COACH_MODEL } from '@/lib/ai/models';
 import { computeSessionArc } from '@/lib/coach/session-arc';
+import { screenRisk } from '@/lib/coach/safety';
 import { getCoachingSnapshot } from '@/lib/program/snapshot';
 import { buildFollowUpAgenda, buildSnapshotBriefing } from '@/lib/prompts/program-block';
 import { SessionMode, Profile, ActiveContext, ExerciseResult } from '@/types';
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { messages, mode, isFirstMessage, startedAt, previousMove, activeProtocol, activeProtocolStep } =
+    const { messages, mode, isFirstMessage, startedAt, previousMove, activeProtocol, activeProtocolStep, sessionGoal } =
       await req.json();
 
     // 3. Create Supabase client
@@ -191,9 +192,34 @@ export async function POST(req: NextRequest) {
     // Il voit la conversation dans l'ordre, la phase, les engagements, et il
     // décide : mouvement, protocole PNL + étape, risque, mots à reprendre.
 
+    // Le pont vers la séance précédente, au premier message seulement. Pas si
+    // une séance abandonnée s'est glissée entre les deux : « la dernière fois »
+    // désignerait la mauvaise.
+    // Pas non plus si elle a touché à une crise : on ne rouvre pas là-dessus.
+    const last = snapshot.lastSession;
+    const lastMessages = (recentSessions || []).find((s: { id: string }) => s.id === last?.id)?.messages;
+    const lastWasCrisis =
+      Array.isArray(lastMessages) &&
+      (lastMessages as Array<{ role: string; content: string }>).some(
+        (m) => m.role === 'user' && screenRisk(m.content) === 'crise'
+      );
+    const bridge: SessionBridge | null =
+      isFirstMessage &&
+      last &&
+      !last.followed_by_open_session &&
+      !lastWasCrisis &&
+      (last.lettre || last.coach_summary || last.pending_actions.length > 0)
+        ? {
+            daysAgo: last.days_ago,
+            lettre: last.lettre,
+            coachSummary: last.coach_summary,
+            pendingActions: last.pending_actions,
+          }
+        : null;
+
     // Rien à superviser sur le message d'ouverture : on ne paie ni l'appel ni l'attente.
     const strategy = !lastUserMessage?.content
-      ? openingStrategy(mode === 'journal' ? 'journal' : 'deblocage')
+      ? openingStrategy(mode === 'journal' ? 'journal' : 'deblocage', bridge !== null)
       : await getCoachingStrategy({
           apiKey: getAnthropicKey(),
           userName,
@@ -222,6 +248,9 @@ export async function POST(req: NextRequest) {
           activeProtocolStep: Number.isFinite(Number(activeProtocolStep))
             ? Math.min(12, Math.max(1, Math.round(Number(activeProtocolStep))))
             : 1,
+          // Même chose pour l'objectif de la séance : sans lui, le superviseur
+          // le reformulait à chaque message et le cap dérivait.
+          previousSessionGoal: typeof sessionGoal === 'string' ? sessionGoal.trim().slice(0, 300) : '',
         });
 
     console.log(
@@ -255,6 +284,7 @@ export async function POST(req: NextRequest) {
       agendaAllowed,
       sessionsTotal: sessionsTotal ?? 0,
       firstSessionDate: firstSessionRow?.[0]?.date ?? null,
+      bridge,
     });
 
     const sessionsWithMessages = (recentSessions || []).filter(
@@ -329,6 +359,7 @@ export async function POST(req: NextRequest) {
         move: strategy.move,
         protocol: strategy.protocol,
         protocol_step: strategy.protocol_step,
+        session_goal: strategy.session_goal,
         risk: strategy.risk,
         agenda_item: strategy.agenda_item,
         has_program: snapshot.program !== null,

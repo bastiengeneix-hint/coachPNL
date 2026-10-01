@@ -47,6 +47,9 @@ function SessionContent() {
   // Idem pour le protocole en cours : sans ça le superviseur repart de zéro à
   // chaque message et papillonne d'un protocole à l'autre sans en finir aucun.
   const activeProtocolRef = useRef<{ id: string | null; step: number }>({ id: null, step: 1 });
+  // Et pour l'objectif de la séance, une fois posé : sinon il est reformulé à
+  // chaque message et le cap dérive.
+  const sessionGoalRef = useRef<string>('');
 
   // Keep sessionRef in sync
   useEffect(() => {
@@ -198,6 +201,7 @@ function SessionContent() {
           previousMove: previousMoveRef.current,
           activeProtocol: activeProtocolRef.current.id,
           activeProtocolStep: activeProtocolRef.current.step,
+          sessionGoal: sessionGoalRef.current,
         }),
       });
 
@@ -211,6 +215,7 @@ function SessionContent() {
         id: data.meta?.protocol ?? null,
         step: data.meta?.protocol_step ?? 1,
       };
+      sessionGoalRef.current = typeof data.meta?.session_goal === 'string' ? data.meta.session_goal : '';
 
       const finalSession = addMessage(withUserMsg, 'coach', data.message);
       setSession(finalSession);
@@ -251,11 +256,15 @@ function SessionContent() {
       const analyzeRes = await fetch('/api/sessions/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: currentSession.messages, sessionId: currentSession.id }),
+        body: JSON.stringify({
+          messages: currentSession.messages,
+          sessionId: currentSession.id,
+          mode: currentSession.mode,
+        }),
       });
 
       if (analyzeRes.ok) {
-        const analysis: SessionAnalysis = await analyzeRes.json();
+        const analysis: SessionAnalysis & { lettre?: string | null } = await analyzeRes.json();
         finalSession = {
           ...finalSession,
           insights: analysis.insights,
@@ -264,6 +273,9 @@ function SessionContent() {
           summary: analysis.summary,
           coach_summary: analysis.coach_summary || null,
           actions: analysis.actions || [],
+          // Pour l'affichage seulement : la lettre est déjà enregistrée côté
+          // serveur, et la sauvegarde du navigateur ne la renvoie pas.
+          lettre: analysis.lettre ?? null,
         };
 
         // Le profil, le parcours et le rappel d'exercice sont écrits par la

@@ -1,6 +1,7 @@
 'use client';
 
 import { Session } from '@/types';
+import SessionFeedback from '@/components/SessionFeedback';
 
 interface SessionEndProps {
   session: Session;
@@ -32,8 +33,18 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
           </p>
         </div>
 
-        {/* Coach summary (warm, personal) */}
-        {displaySummary && (
+        {/* La lettre de séance : ce qu'on a vu, sa phrase, ce qu'il ou elle repart faire. */}
+        {session.lettre && (
+          <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
+            <p className="text-xs font-medium text-teal-600 mb-2 uppercase tracking-wide">
+              Ta lettre de séance
+            </p>
+            <p className="text-sm text-teal-900 leading-relaxed whitespace-pre-line">{session.lettre}</p>
+          </div>
+        )}
+
+        {/* Coach summary (warm, personal) — quand il n'y a pas de lettre */}
+        {!session.lettre && displaySummary && (
           <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
             <p className="text-xs font-medium text-teal-600 mb-2 uppercase tracking-wide">
               Ce que je retiens
@@ -45,7 +56,7 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
         )}
 
         {/* Fallback: last coach message if no summary */}
-        {!displaySummary && lastCoachMessage && (
+        {!session.lettre && !displaySummary && lastCoachMessage && (
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
             <p className="text-xs font-medium text-gray-400 mb-2 uppercase tracking-wide">
               Dernière note du coach
@@ -54,6 +65,11 @@ export default function SessionEnd({ session, onClose }: SessionEndProps) {
               {lastCoachMessage.content}
             </p>
           </div>
+        )}
+
+        {/* Le retour de la personne : il règle le coach pour la séance suivante. */}
+        {session.messages.filter((m) => m.role === 'user').length >= 2 && (
+          <SessionFeedback sessionId={session.id} />
         )}
 
         {/* Actions */}

@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { createServerClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/types';
+
+const CLIENT_WRITABLE = [
+  'id',
+  'date',
+  'mode',
+  'messages',
+  'insights',
+  'themes',
+  'exercice_propose',
+  'exercice_fait',
+  'summary',
+  'coach_summary',
+  'actions',
+  'ended',
+] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,17 +68,21 @@ export async function POST(request: NextRequest) {
     }
     const userId = session.user.id;
 
-    const body = await request.json();
-    const sessionData = {
-      ...body,
-      user_id: userId,
-    };
+    // Seulement les colonnes que le navigateur a le droit d'écrire. La lettre et
+    // le retour de fin de séance sont écrits côté serveur : un objet de séance
+    // renvoyé tel quel ne doit ni les écraser, ni casser la sauvegarde si une
+    // colonne manque encore en base.
+    const body = (await request.json()) as Record<string, unknown>;
+    const sessionData: Record<string, unknown> = { user_id: userId };
+    for (const key of CLIENT_WRITABLE) {
+      if (key in body) sessionData[key] = body[key];
+    }
 
     const supabase = createServerClient();
 
     const { data, error } = await supabase
       .from('sessions')
-      .upsert(sessionData, { onConflict: 'id' })
+      .upsert(sessionData as Database['public']['Tables']['sessions']['Insert'], { onConflict: 'id' })
       .select()
       .single();
 

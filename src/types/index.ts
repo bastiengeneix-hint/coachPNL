@@ -26,6 +26,25 @@ export interface SessionAction {
   done: boolean;
 }
 
+/**
+ * Le retour de la personne sur la séance, en quatre curseurs de 0 à 10
+ * (sur le modèle de la Session Rating Scale). C'est la seule information
+ * directe que le coach a sur ce qui marche pour elle.
+ */
+export interface SessionFeedback {
+  /** Ce que j'ai dit a été entendu. */
+  ecoute: number;
+  /** On a parlé de ce qui compte pour moi. */
+  sujet: number;
+  /** La façon de faire me convient. */
+  approche: number;
+  /** Globalement, cette séance m'a servi. */
+  global: number;
+  /** Ce qui aurait dû être différent, dans ses mots. Facultatif. */
+  note: string | null;
+  at: string;
+}
+
 export interface Session {
   id: string;
   date: string;
@@ -39,6 +58,10 @@ export interface Session {
   coach_summary: string | null;
   actions: SessionAction[];
   ended: boolean;
+  /** Lettre de séance, écrite côté serveur à l'analyse. Jamais envoyée par le client. */
+  lettre?: string | null;
+  /** Retour de fin de séance. Écrit par /api/sessions/feedback, jamais par le client. */
+  feedback?: SessionFeedback | null;
 }
 
 export interface Profile {
@@ -447,6 +470,22 @@ export interface CoachingSnapshot {
   recentCheckins: Checkin[];
   /** Actions non soldées, extraites des séances récentes. */
   pendingActions: Array<{ text: string; days_ago: number }>;
+  /**
+   * La dernière séance refermée (14 jours max), et ce qu'elle a laissé. Au
+   * premier message d'une nouvelle séance, c'est la précédente : la séance en
+   * cours n'est pas encore enregistrée.
+   */
+  lastSession: {
+    id: string;
+    date: string;
+    days_ago: number;
+    lettre: string | null;
+    coach_summary: string | null;
+    pending_actions: string[];
+    feedback: SessionFeedback | null;
+    /** Une séance non refermée a eu lieu depuis (abandonnée, pas encore balayée). */
+    followed_by_open_session: boolean;
+  } | null;
   derived: {
     /** Semaine en cours du parcours (1-indexée). */
     week: number | null;

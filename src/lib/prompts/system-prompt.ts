@@ -312,7 +312,44 @@ ${items}`;
 
 // ─── BLOC MODE ──────────────────────────────────────────────────────────────
 
-function buildModeBlock(mode: SessionMode, isFirstMessage: boolean, userName: string): string {
+/** Ce que la dernière séance a laissé, pour ouvrir la suivante dessus. */
+export interface SessionBridge {
+  daysAgo: number;
+  lettre: string | null;
+  coachSummary: string | null;
+  pendingActions: string[];
+}
+
+/**
+ * La séance s'ouvrait à neutre, comme si la précédente n'avait pas eu lieu : le
+ * suivi est caché pendant les premiers échanges (pour ne plus accueillir par un
+ * contrôle), et rien d'autre ne faisait le lien. Le pont rappelle où on s'était
+ * laissés, sans rien demander.
+ */
+function buildBridgeBlock(bridge: SessionBridge, mode: SessionMode, userName: string): string {
+  const when = bridge.daysAgo === 0 ? "plus tôt aujourd'hui" : bridge.daysAgo === 1 ? 'hier' : `il y a ${bridge.daysAgo} jours`;
+  const matiere: string[] = [];
+  if (bridge.lettre) matiere.push(`La lettre que tu lui as laissée :\n« ${bridge.lettre} »`);
+  else if (bridge.coachSummary) matiere.push(`Ce que tu en avais retenu : « ${bridge.coachSummary} »`);
+  if (bridge.pendingActions.length > 0) {
+    matiere.push(`Ce que ${userName} repartait faire : ${bridge.pendingActions.map((a) => `« ${a} »`).join(', ')}`);
+  }
+
+  const forme =
+    mode === 'deblocage'
+      ? `Ton premier message tient en deux phrases : la phrase de pont, puis tu ouvres la porte et tu te tais. Par exemple : « La dernière fois tu repartais avec [X]. On y reviendra si tu veux — là, je t'écoute. » Pas de question.`
+      : `Ta phrase chaleureuse d'ouverture EST le pont. Puis ta question simple sur sa journée.`;
+
+  return `## Où vous vous étiez laissés (${when})
+
+${matiere.join('\n\n')}
+
+Tu ouvres sur UNE chose de cette séance-là — ce que ${userName} repartait faire, ou ce que vous aviez vu — avec ses mots. Ce n'est pas une relance : tu ne demandes PAS où ça en est, tu dis que ça peut attendre. ${userName} reste libre d'arriver avec tout autre chose, et c'est ce qu'on écoute d'abord.
+${forme}
+Si cette dernière séance a été très lourde (détresse, idées noires), pas de pont sur le contenu : tu dis simplement que tu es là, et tu ouvres la porte.`;
+}
+
+function buildModeBlock(mode: SessionMode, isFirstMessage: boolean, userName: string, hasBridge = false): string {
   const parts: string[] = ['## Mode de la séance'];
 
   if (mode === 'deblocage') {
@@ -320,7 +357,11 @@ function buildModeBlock(mode: SessionMode, isFirstMessage: boolean, userName: st
       'Déblocage. Quelque chose bloque, maintenant. Tu laisses parler, tu accueilles, tu creuses. Ton premier mouvement est un miroir ou une observation — jamais une question.'
     );
     if (isFirstMessage) {
-      parts.push('Ce message est le tout premier. Deux phrases maximum pour ouvrir la porte, et tu te tais.');
+      parts.push(
+        hasBridge
+          ? 'Ce message est le tout premier. Deux phrases maximum : le pont vers la dernière séance (plus bas), puis tu ouvres la porte et tu te tais.'
+          : 'Ce message est le tout premier. Deux phrases maximum pour ouvrir la porte, et tu te tais.'
+      );
     }
   } else {
     parts.push(
@@ -328,7 +369,9 @@ function buildModeBlock(mode: SessionMode, isFirstMessage: boolean, userName: st
     );
     if (isFirstMessage) {
       parts.push(
-        `Ce message est le tout premier : une phrase chaleureuse qui s'appuie sur ce que tu sais de ${userName} — et si tu ne sais rien encore, reste simple et vrai plutôt que chaleureux à vide. Puis une question simple sur sa journée. Rien de générique, rien qui ressemble à un accueil de standard téléphonique.`
+        hasBridge
+          ? `Ce message est le tout premier : une phrase chaleureuse qui fait le pont avec votre dernière séance (plus bas), puis une question simple sur sa journée. Rien de générique, rien qui ressemble à un accueil de standard téléphonique.`
+          : `Ce message est le tout premier : une phrase chaleureuse qui s'appuie sur ce que tu sais de ${userName} — et si tu ne sais rien encore, reste simple et vrai plutôt que chaleureux à vide. Puis une question simple sur sa journée. Rien de générique, rien qui ressemble à un accueil de standard téléphonique.`
       );
     }
   }
@@ -581,6 +624,8 @@ export interface BuildPromptParams {
   agendaAllowed?: boolean;
   sessionsTotal?: number;
   firstSessionDate?: string | null;
+  /** Premier message seulement : ce que la dernière séance a laissé. */
+  bridge?: SessionBridge | null;
 }
 
 /**
@@ -628,7 +673,8 @@ export function buildSystemPromptParts(params: BuildPromptParams): { stable: str
     buildExerciseResultsBlock(params.userName, params.exerciseResults || []),
     params.snapshot ? buildLibraryBlock(params.snapshot.insights, params.userName) : '',
     buildRAGBlock(params.ragPassages, params.userName),
-    buildModeBlock(params.mode, params.isFirstMessage, params.userName),
+    buildModeBlock(params.mode, params.isFirstMessage, params.userName, Boolean(params.isFirstMessage && params.bridge)),
+    params.isFirstMessage && params.bridge ? buildBridgeBlock(params.bridge, params.mode, params.userName) : '',
     params.arc ? buildArcBlock(params.arc) : '',
     protocol ? buildProtocolBlock(protocol, params.strategy?.protocol_step ?? 1) : '',
     params.strategy ? buildStrategyBlock(params.userName, params.strategy, params.agenda || []) : '',

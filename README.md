@@ -27,6 +27,11 @@ Il rattrape les colonnes ecrites par l'app mais creees par aucun SQL (`sessions.
 protocoles, check-ins). Sans `sessions.ended`, aucune seance ne peut etre sauvegardee ; sans
 `exercise_reminders.message`, aucun rappel d'exercice ne peut etre cree.
 
+Depuis le 2026-10-01, elle ajoute aussi `sessions.lettre`, `sessions.lettre_envoyee_le` et
+`sessions.feedback` (lettre de seance et retour de fin de seance). Tant qu'elle n'est pas rejouee,
+ces deux fonctions restent muettes, et rien d'autre ne casse : la sauvegarde des seances n'ecrit
+que des colonnes connues, et ces colonnes sont lues et ecrites a part.
+
 ## Architecture
 
 ```
@@ -216,12 +221,29 @@ comme l'analyse : ca marche meme si l'onglet se ferme.
   n'etait pas proprement termine etait perdu.
 - **Engagements** : les actions non faites des 14 derniers jours sont injectees dans le prompt, et
   le superviseur decide quand le coach demande ou ca en est.
+- **Lettre de seance** (`lib/coach/session-letter.ts`) : a la fin, le modele du coach ecrit une
+  courte lettre dans sa voix (ce qu'on a vu avec les mots de la personne, sa phrase qui compte, ce
+  qu'elle repart faire, avec la prediction si elle a ete dite). Ecrite cote serveur (analyse et
+  balayage), affichee en fin de seance et dans l'historique, envoyee par notification le lendemain
+  matin. Pas de lettre si la seance a touche a une crise.
+- **Retour de fin de seance** (`lib/coach/feedback.ts`) : quatre curseurs de 0 a 10, sur le modele
+  de la Session Rating Scale (entendu, sujet qui compte, facon de faire, globalement). Les notes
+  reglent la facon de faire du coach des le premier message de la seance suivante ; une note sous 7
+  passe en tete de l'ordre du jour : le coach demande ce qui aurait du etre different.
+- **Pont d'ouverture** : le premier message d'une seance rappelle en une phrase ou on s'etait
+  laisses (la lettre, ce que la personne repartait faire), sans rien demander. Pas de pont si une
+  seance abandonnee s'est glissee entre les deux, ni si la precedente a touche a une crise.
+- **Objectif de seance** : une fois pose, il est renvoye par le navigateur a chaque message, comme
+  le protocole en cours. Le superviseur le reformulait a chaque tour. En seance longue, il recoit
+  aussi les premiers messages de fond, sortis de sa fenetre des 12 derniers.
 
 ## Crons (Vercel)
 
 - `/api/notifications/send` toutes les 2 h : rappels d'exercice + relances du quotidien
   (intention du matin 7-10 h, pratique 17-20 h, depot du soir 20-23 h, heure de Paris, une seule
-  notification par personne et par passage).
+  notification par personne et par passage). Le matin, une lettre de seance pas encore envoyee
+  passe avant l'intention du jour ; la notification ne montre rien de son contenu (ecran
+  verrouille) et ouvre `/sessions?lettre=<id>`.
 - `/api/bilans/generate?type=weekly` le lundi a 6 h : le miroir hebdo.
 - `/api/bilans/generate` le 1er du mois a 8 h : mensuel, et annuel en janvier.
 

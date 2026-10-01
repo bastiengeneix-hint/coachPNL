@@ -173,6 +173,26 @@ async function sendDailyNudges(
     doneMoments.set(c.user_id, set);
   }
 
+  // Les lettres de séance pas encore envoyées : le matin, elles passent avant
+  // l'intention du jour. Lecture à part : si la colonne manque, seules les
+  // lettres sautent, pas les autres relances.
+  const lettreByUser = new Map<string, { id: string }>();
+  if (kind === 'matin') {
+    const since48h = new Date(Date.now() - 48 * 3600000).toISOString();
+    const { data: lettres, error: lettresError } = await supabase
+      .from('sessions')
+      .select('id, user_id')
+      .eq('ended', true)
+      .not('lettre', 'is', null)
+      .is('lettre_envoyee_le', null)
+      .gte('date', since48h)
+      .order('date', { ascending: false });
+    if (lettresError) console.warn('Nudges: letters unavailable:', lettresError.message);
+    for (const l of lettres ?? []) {
+      if (!lettreByUser.has(l.user_id)) lettreByUser.set(l.user_id, { id: l.id });
+    }
+  }
+
   const loggedToday = new Set((logs ?? []).filter((l) => l.done).map((l) => l.practice_id));
   const practicesByUser = new Map<string, Array<{ id: string; label: string; cadence: string }>>();
   for (const p of practices ?? []) {
@@ -198,8 +218,17 @@ async function sendDailyNudges(
   for (const [userId, subscriptions] of byUser) {
     const moments = doneMoments.get(userId) || new Set<string>();
     let payload: { title: string; body: string; url: string; tag: string } | null = null;
+    const lettre = lettreByUser.get(userId);
 
-    if (kind === 'matin' && !moments.has('matin')) {
+    if (kind === 'matin' && lettre) {
+      payload = {
+        title: 'Ta lettre de séance',
+        // Rien du contenu : une notification s'affiche sur l'écran verrouillé.
+        body: "Ce qu'on a vu, et ce que tu repars faire.",
+        url: `/sessions?lettre=${lettre.id}`,
+        tag: `lettre-${lettre.id}`,
+      };
+    } else if (kind === 'matin' && !moments.has('matin')) {
       payload = {
         title: 'Ton intention du jour',
         body: 'Une phrase, et tu y vas.',
@@ -229,10 +258,12 @@ async function sendDailyNudges(
 
     if (!payload) continue;
 
+    let delivered = false;
     for (const subscription of subscriptions) {
       try {
         await webpush.sendNotification(subscription as never, JSON.stringify(payload));
         sent++;
+        delivered = true;
       } catch (err) {
         if ((err as { statusCode?: number }).statusCode === 410) {
           await supabase.from('push_subscriptions').delete().eq('user_id', userId);
@@ -240,6 +271,16 @@ async function sendDailyNudges(
           console.warn('Nudge send error:', err);
         }
       }
+    }
+
+    // Une lettre ne part qu'une fois : l'hiver, deux passages tombent dans la
+    // fenêtre du matin.
+    if (lettre && payload.tag === `lettre-${lettre.id}` && delivered) {
+      const { error } = await supabase
+        .from('sessions')
+        .update({ lettre_envoyee_le: new Date().toISOString() })
+        .eq('id', lettre.id);
+      if (error) console.warn('Nudges: letter not marked as sent:', error.message);
     }
   }
 

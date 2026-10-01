@@ -98,6 +98,9 @@ export interface Database {
           coach_summary: string | null;
           actions: Json;
           ended: boolean;
+          lettre: string | null;
+          lettre_envoyee_le: string | null;
+          feedback: Json | null;
         };
         Insert: {
           id?: string;
@@ -113,6 +116,9 @@ export interface Database {
           coach_summary?: string | null;
           actions?: Json;
           ended?: boolean;
+          lettre?: string | null;
+          lettre_envoyee_le?: string | null;
+          feedback?: Json | null;
         };
         Update: {
           id?: string;
@@ -128,6 +134,9 @@ export interface Database {
           coach_summary?: string | null;
           actions?: Json;
           ended?: boolean;
+          lettre?: string | null;
+          lettre_envoyee_le?: string | null;
+          feedback?: Json | null;
         };
         Relationships: [
           {

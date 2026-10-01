@@ -257,9 +257,27 @@ la structure standard d'une séance en thérapie cognitive (pont, puis ordre du 
 
 | Vague | Quoi | Pourquoi d'abord |
 |---|---|---|
-| 1. Cette semaine | Défaut `session_goal` (4) · les quatre curseurs (3) · pont d'ouverture (8) · lettre de séance (7) | Petits, visibles dès la prochaine séance. Et les curseurs commencent à mesurer avant les gros changements |
+| 1. **Livrée le 2026-10-01** | Défaut `session_goal` (4) · les quatre curseurs (3) · pont d'ouverture (8) · lettre de séance (7) | Petits, visibles dès la prochaine séance. Et les curseurs commencent à mesurer avant les gros changements |
 | 2. Les deux semaines suivantes | Carte du problème (1) · expériences et débrief (2) · mesure de sévérité (3) | Le cœur de la transformation. La carte d'abord : les expériences s'y accrochent |
 | 3. Ensuite, chiffres en main | Moment de vérité et divergence entre séances (5) · contrats de séance (6) · refonte du superviseur (4) · tableau de bord (3) | Les changements les plus risqués pour le ton du coach. On les juge sur les curseurs, pas à l'impression |
+
+### Vague 1 : ce qui a été livré, et ce qui reste à vérifier en vrai
+
+- **Objectif de séance** porté par le navigateur d'un message à l'autre. En séance longue, le
+  superviseur reçoit aussi les deux premiers messages de fond sortis de sa fenêtre.
+- **Quatre curseurs** sur l'écran de fin (`SessionFeedback.tsx`), enregistrés dans
+  `sessions.feedback` par `/api/sessions/feedback`. Ils règlent le coach dès le premier message de
+  la séance suivante. Une note sous 7 passe en tête de l'ordre du jour.
+- **Lettre de séance** écrite par le modèle du coach à l'analyse et au balayage, affichée en fin
+  de séance et dans `/sessions`, envoyée le lendemain matin. La notification ne montre rien du
+  contenu.
+- **Pont d'ouverture** au premier message, sans rien demander. Rien si une séance abandonnée
+  s'est intercalée ou si la précédente a touché à une crise.
+- Au passage : la sauvegarde des séances n'écrit plus que des colonnes connues.
+
+Testé hors ligne (29 cas, faux serveur d'API et fausse base), migration rejouée deux fois sur
+une base locale, `tsc` et `next build` propres, lint inchangé. **Pas encore vu sur une vraie
+séance** : il faut rejouer `src/migration.sql` en prod, puis faire une séance et la terminer.
 
 ## Ce que les séances doivent trancher
 

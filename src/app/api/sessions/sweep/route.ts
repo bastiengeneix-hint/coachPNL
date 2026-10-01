@@ -8,6 +8,8 @@ import { getCoachingSnapshot } from '@/lib/program/snapshot';
 import { extractHarvest, applyHarvest, buildLibraryQuery } from '@/lib/program/harvest';
 import { retrievePassages } from '@/lib/rag/retrieve';
 import { buildActiveContext } from '@/lib/memory/context-builder';
+import { writeSessionLetter } from '@/lib/coach/session-letter';
+import { DEFAULT_COACH_NAME } from '@/lib/prompts/system-prompt';
 import type { Json } from '@/lib/supabase/types';
 import type { Message, Profile, Session } from '@/types';
 
@@ -23,6 +25,9 @@ import type { Message, Profile, Session } from '@/types';
 const STALE_AFTER_HOURS = 8;
 const MIN_MESSAGES_TO_ANALYZE = 4;
 const MAX_SESSIONS_PER_SWEEP = 3;
+
+// Jusqu'à trois séances, chacune lue trois fois (analyse, récolte, lettre).
+export const maxDuration = 300;
 
 export async function POST() {
   try {
@@ -91,9 +96,15 @@ export async function POST() {
       const libraryQuery = buildLibraryQuery(snapshot, profile);
       const ragPassages = libraryQuery ? await retrievePassages(libraryQuery, [], 6) : [];
 
-      const [analysis, harvest] = await Promise.all([
+      const [analysis, harvest, lettre] = await Promise.all([
         analyzeSession(messages, profile),
         extractHarvest({ userName, messages, snapshot, ragPassages }),
+        writeSessionLetter({
+          coachName: profile.preferences.coach_name || DEFAULT_COACH_NAME,
+          userName,
+          mode: row.mode === 'journal' ? 'journal' : 'deblocage',
+          messages,
+        }),
       ]);
 
       await supabase
@@ -108,6 +119,13 @@ export async function POST() {
           actions: analysis.actions as unknown as Json,
         })
         .eq('id', row.id);
+
+      // À part : si la colonne manque, la séance doit quand même être refermée,
+      // sinon elle serait rebalayée à chaque passage.
+      if (lettre) {
+        const { error: letterError } = await supabase.from('sessions').update({ lettre }).eq('id', row.id);
+        if (letterError) console.warn('Sweep: letter not saved:', letterError.message);
+      }
 
       try {
         await applyProfileEvolution(supabase, userId, analysis.profile_evolution);

@@ -19,7 +19,9 @@ import type {
   Program,
   ProgramMilestone,
   ProtocolRun,
+  SessionAction,
 } from '@/types';
+import { parseFeedback } from '@/lib/coach/feedback';
 
 const DAY = 86400000;
 
@@ -84,6 +86,7 @@ export async function getCoachingSnapshot(
     checkinsRes,
     sessionsRes,
     insightsRes,
+    closingRes,
   ] = await Promise.all([
     supabase.from('programs').select('*').eq('user_id', userId).eq('statut', 'actif').limit(1),
     supabase.from('measures').select('*').eq('user_id', userId).eq('active', true).order('created_at'),
@@ -92,7 +95,20 @@ export async function getCoachingSnapshot(
     supabase.from('checkins').select('*').eq('user_id', userId).gte('day', since30).order('day', { ascending: false }),
     supabase.from('sessions').select('date, actions').eq('user_id', userId).gte('date', since14).order('date', { ascending: false }).limit(10),
     supabase.from('coach_insights').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(8),
+    // Lecture séparée : si la migration de la lettre et du retour n'est pas
+    // encore passée, seule cette lecture échoue, pas tout le suivi.
+    supabase
+      .from('sessions')
+      .select('id, date, ended, lettre, coach_summary, actions, feedback')
+      .eq('user_id', userId)
+      .gte('date', since14)
+      .order('date', { ascending: false })
+      .limit(5),
   ]);
+
+  if (closingRes.error) {
+    console.warn('Snapshot: last session unavailable:', closingRes.error.message);
+  }
 
   const programRow = programRes.data?.[0] ?? null;
   const program: Program | null = programRow
@@ -278,6 +294,28 @@ export async function getCoachingSnapshot(
 
   const lastSessionDate = (sessionsRes.data || [])[0]?.date ?? null;
 
+  // ── La dernière séance refermée ───────────────────────────────────────────
+  // Ce qu'elle a laissé : la lettre, les engagements, le retour de la personne.
+  // C'est le pont vers la séance suivante.
+  const closingRows = closingRes.data || [];
+  const closedIndex = closingRows.findIndex((s) => s.ended);
+  const closed = closedIndex >= 0 ? closingRows[closedIndex] : null;
+  const lastSession: CoachingSnapshot['lastSession'] = closed
+    ? {
+        id: closed.id,
+        date: closed.date,
+        days_ago: Math.max(0, daysBetween(closed.date)),
+        lettre: closed.lettre,
+        coach_summary: closed.coach_summary,
+        pending_actions: (Array.isArray(closed.actions) ? (closed.actions as unknown as SessionAction[]) : [])
+          .filter((a) => a && !a.done && a.text)
+          .map((a) => a.text)
+          .slice(0, 3),
+        feedback: parseFeedback(closed.feedback),
+        followed_by_open_session: closedIndex > 0,
+      }
+    : null;
+
   // Le fil rouge : les idées pas encore transmises d'abord, c'est ce que le
   // coach doit avoir sous la main.
   const insights: CoachInsight[] = (insightsRes.data || [])
@@ -305,6 +343,7 @@ export async function getCoachingSnapshot(
     checkinToday,
     recentCheckins: checkins.slice(0, 7),
     pendingActions,
+    lastSession,
     derived: {
       week: program ? Math.max(1, Math.floor(daysBetween(program.started_at) / 7) + 1) : null,
       totalWeeks:

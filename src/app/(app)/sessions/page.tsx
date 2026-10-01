@@ -34,6 +34,16 @@ export default function SessionsPage() {
         ]);
 
         if (sessionsRes.ok) setSessions(await sessionsRes.json());
+
+        // Lien direct vers une lettre (notification du lendemain matin) : on
+        // ouvre la séance concernée et on l'amène à l'écran.
+        const lettreId = new URLSearchParams(window.location.search).get('lettre');
+        if (lettreId) {
+          setExpandedId(lettreId);
+          setTimeout(() => {
+            document.getElementById(`session-${lettreId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        }
         if (bilansRes.ok) setBilans(await bilansRes.json());
         if (actionsRes.ok) setActions(await actionsRes.json());
       } catch (err) {
@@ -230,7 +240,7 @@ export default function SessionsPage() {
                     const coachSummary = s.coach_summary || s.summary;
 
                     return (
-                      <div key={s.id} className="animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
+                      <div key={s.id} id={`session-${s.id}`} className="animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
                         <button
                           onClick={() => toggleExpand(s.id)}
                           className="w-full bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-left transition-all duration-200 hover:shadow-md"
@@ -294,6 +304,14 @@ export default function SessionsPage() {
 
                         {isExpanded && (
                           <div className="mt-2 bg-white rounded-2xl border border-gray-200 p-5 animate-fade-in">
+                            {s.lettre && (
+                              <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 mb-5">
+                                <p className="text-xs font-medium text-teal-600 mb-2 uppercase tracking-wide">
+                                  Ta lettre de séance
+                                </p>
+                                <p className="text-sm text-teal-900 leading-relaxed whitespace-pre-line">{s.lettre}</p>
+                              </div>
+                            )}
                             {s.messages.length > 0 ? (
                               <div className="flex flex-col gap-4">
                                 {s.messages.map((msg) => (

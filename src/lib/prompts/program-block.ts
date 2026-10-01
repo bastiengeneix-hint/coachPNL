@@ -5,6 +5,7 @@
 // modèle) : on ne laisse pas au hasard le fait de relancer un engagement.
 
 import { PROTOCOLS } from '@/lib/pnl/protocols';
+import { FEEDBACK_ITEMS, adjustmentFor, formatFeedbackLine, lowItems } from '@/lib/coach/feedback';
 import type { CoachingSnapshot } from '@/types';
 
 /**
@@ -13,6 +14,20 @@ import type { CoachingSnapshot } from '@/types';
  */
 export function buildFollowUpAgenda(snapshot: CoachingSnapshot): string[] {
   const agenda: string[] = [];
+
+  // 0. Le retour de la dernière séance, s'il dit que quelque chose n'a pas
+  // marché. Avant tout le reste : si la façon de faire ne convient pas, aucun
+  // suivi ne tiendra.
+  const feedback = snapshot.lastSession?.feedback;
+  const low = feedback ? lowItems(feedback) : [];
+  if (feedback && low.length > 0) {
+    const notes = low.map((i) => `${i.value}/10 à « ${i.label} »`).join(', ');
+    agenda.push(
+      `RETOUR SUR LA DERNIÈRE SÉANCE : noté ${notes}${
+        feedback.note ? `, avec ce mot : « ${feedback.note} »` : ''
+      }. Tu demandes simplement ce qui aurait dû être différent, et tu prends la réponse telle qu'elle vient : sans te justifier, sans t'excuser trois fois. Puis tu changes vraiment ta façon de faire.`
+    );
+  }
 
   // 1. Pas de parcours = rien ne peut s'accrocher. C'est LA priorité.
   if (!snapshot.program) {
@@ -180,6 +195,27 @@ export function buildProgramBlock(params: {
     );
   }
 
+  // ── Retour sur la dernière séance ─────────────────────────────────────────
+  // Visible dès le premier message : ça règle ta façon de faire, pas ce dont
+  // vous parlez. La question elle-même passe par l'ordre du jour.
+  const feedback = snapshot.lastSession?.feedback;
+  if (feedback) {
+    const days = snapshot.lastSession!.days_ago;
+    const scores = FEEDBACK_ITEMS.map((item) => `- « ${item.label} » : ${feedback[item.key]}/10`).join('\n');
+    const low = lowItems(feedback);
+    const lines = [
+      `### Son retour sur votre dernière séance (${days === 0 ? "aujourd'hui" : days === 1 ? 'hier' : `il y a ${days} jours`})`,
+      scores,
+    ];
+    if (feedback.note) lines.push(`Ce qui aurait dû être différent, dans ses mots : « ${feedback.note} »`);
+    lines.push(
+      low.length > 0
+        ? `Ce que tu changes dès maintenant :\n${low.map((i) => `- ${adjustmentFor(i.key)}`).join('\n')}`
+        : 'La façon de faire lui a convenu. Pas besoin de le commenter.'
+    );
+    parts.push(lines.join('\n'));
+  }
+
   // ── Engagements ───────────────────────────────────────────────────────────
   const engagements = snapshot.pendingActions.map((a) => `- ${a.text} (pris il y a ${a.days_ago} j)`);
   if (params.pendingExercice) {
@@ -256,6 +292,14 @@ export function buildSnapshotBriefing(snapshot: CoachingSnapshot): string {
   }
   if (snapshot.derived.daysSinceLastSession !== null) {
     lines.push(`Dernière séance il y a ${snapshot.derived.daysSinceLastSession} jour(s).`);
+  }
+  if (snapshot.lastSession?.feedback) {
+    const fb = snapshot.lastSession.feedback;
+    lines.push(
+      `Son retour sur la dernière séance : ${formatFeedbackLine(fb)}${
+        lowItems(fb).length > 0 ? ' — EN DESSOUS DE 7 : le coach doit changer sa façon de faire' : ''
+      }${fb.note ? ` · « ${fb.note} »` : ''}`
+    );
   }
 
   const agenda = buildFollowUpAgenda(snapshot);

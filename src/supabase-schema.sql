@@ -48,7 +48,12 @@ CREATE TABLE sessions (
   coach_summary TEXT,
   actions JSONB NOT NULL DEFAULT '[]',
   -- false = séance en cours (reprenable), true = séance refermée et analysée.
-  ended BOOLEAN NOT NULL DEFAULT false
+  ended BOOLEAN NOT NULL DEFAULT false,
+  -- Lettre de séance écrite à l'analyse, et date de son envoi par notification.
+  lettre TEXT,
+  lettre_envoyee_le TIMESTAMPTZ,
+  -- Retour de fin de séance : {ecoute, sujet, approche, global, note, at}.
+  feedback JSONB
 );
 
 -- Active contexts table (one per user)

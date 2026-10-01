@@ -7,7 +7,13 @@ import { applyProfileEvolution } from '@/lib/memory/apply-evolution';
 import { getCoachingSnapshot } from '@/lib/program/snapshot';
 import { extractHarvest, applyHarvest, buildLibraryQuery } from '@/lib/program/harvest';
 import { retrievePassages } from '@/lib/rag/retrieve';
-import type { Message, Profile } from '@/types';
+import { writeSessionLetter } from '@/lib/coach/session-letter';
+import { DEFAULT_COACH_NAME } from '@/lib/prompts/system-prompt';
+import type { Message, Profile, SessionMode } from '@/types';
+
+// Trois appels en parallèle sur toute la séance (analyse, récolte, lettre) :
+// une séance longue dépasse vite le délai par défaut.
+export const maxDuration = 120;
 
 const FREQUENCY_HOURS: Record<string, number> = {
   daily: 24,
@@ -30,7 +36,11 @@ export async function POST(req: NextRequest) {
     }
     const userId = session.user.id;
 
-    const { messages, sessionId } = (await req.json()) as { messages: Message[]; sessionId?: string };
+    const { messages, sessionId, mode } = (await req.json()) as {
+      messages: Message[];
+      sessionId?: string;
+      mode?: SessionMode;
+    };
 
     if (!messages || messages.length < 2) {
       return NextResponse.json({ error: 'Pas assez de messages à analyser' }, { status: 400 });
@@ -57,6 +67,7 @@ export async function POST(req: NextRequest) {
     };
 
     const userName = userRow?.name || 'ami';
+    const coachName = profile.preferences.coach_name || DEFAULT_COACH_NAME;
 
     // La bibliothèque est interrogée UNE fois par séance, sur le travail de fond
     // — pas à chaque message sur la dernière phrase. C'est ce qui donne un fil
@@ -66,12 +77,29 @@ export async function POST(req: NextRequest) {
       ? await retrievePassages(libraryQuery, [], 6)
       : [];
 
-    // Deux lectures indépendantes de la même séance : le résumé et la récolte.
-    // Séparées exprès — un seul appel qui fait les deux fait mal les deux.
-    const [analysis, harvest] = await Promise.all([
+    // Trois lectures indépendantes de la même séance : le résumé, la récolte et
+    // la lettre. Séparées exprès — un seul appel qui fait tout fait tout mal.
+    const [analysis, harvest, lettre] = await Promise.all([
       analyzeSession(messages, profile),
       extractHarvest({ userName, messages, snapshot, ragPassages }),
+      writeSessionLetter({
+        coachName,
+        userName,
+        mode: mode === 'journal' ? 'journal' : 'deblocage',
+        messages,
+      }),
     ]);
+
+    // La lettre est écrite ici, côté serveur, et jamais par le navigateur. Mise
+    // à jour à part : si la colonne manque encore, seule la lettre est perdue.
+    if (lettre && sessionId) {
+      const { error } = await supabase
+        .from('sessions')
+        .update({ lettre })
+        .eq('id', sessionId)
+        .eq('user_id', userId);
+      if (error) console.warn('Analyze: letter not saved:', error.message);
+    }
 
     // Profil : croyances, patterns, barrières ULP, lexique.
     try {
@@ -112,7 +140,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ...analysis, harvest: harvestResult });
+    return NextResponse.json({ ...analysis, harvest: harvestResult, lettre });
   } catch (error) {
     console.error('Session analyze error:', error);
     return NextResponse.json({ error: 'Erreur lors de l\'analyse' }, { status: 500 });
